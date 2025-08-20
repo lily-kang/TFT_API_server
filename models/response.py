@@ -68,3 +68,26 @@ class BatchPipelineResponse(BaseModel):
                 ]
             }
         } 
+
+
+class SyntaxFixResponse(BaseModel):
+    """구문 수정 응답 모델 (단순화된 버전)"""
+    request_id: str = Field(description="요청 ID")
+    success: bool = Field(description="성공 여부")
+    original_text: str = Field(description="원본 텍스트")
+    fixed_text: Optional[str] = Field(default=None, description="수정된 텍스트")
+    
+    # 지표 정보
+    original_metrics: Optional[Dict[str, float]] = Field(default=None, description="원본 지표")
+    fixed_metrics: Optional[Dict[str, float]] = Field(default=None, description="수정 후 지표")
+    
+    # 처리 정보
+    candidates_generated: int = Field(default=0, description="생성된 후보 수")
+    candidates_passed: int = Field(default=0, description="통과한 후보 수")
+    processing_time: float = Field(description="처리 시간 (초)")
+    
+    # 에러 정보
+    error_message: Optional[str] = Field(default=None, description="에러 메시지")
+    
+    # 상세 정보 (옵션)
+    detailed_metrics: Optional[Dict[str, Any]] = Field(default=None, description="상세 지표 정보") 

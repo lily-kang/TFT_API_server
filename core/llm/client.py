@@ -1,4 +1,5 @@
 import openai
+import asyncio
 from typing import List, Optional
 from config.settings import settings
 from utils.exceptions import LLMAPIError
@@ -87,7 +88,7 @@ class LLMClient:
         candidates_per_temp: int = 2
     ) -> List[str]:
         """
-        각 temperature별로 여러 개의 후보 생성
+        각 temperature별로 여러 개의 후보 생성 (병렬 처리)
         
         Args:
             prompt: 생성 프롬프트
@@ -97,10 +98,53 @@ class LLMClient:
         Returns:
             생성된 텍스트 리스트 (총 len(temperatures) × candidates_per_temp 개)
         """
+        # 모든 호출을 병렬로 처리하기 위한 태스크 리스트 생성
+        tasks = []
+        task_info = []  # 로깅용 정보
+        
+        for temp in temperatures:
+            for i in range(candidates_per_temp):
+                task = self.generate_text(prompt, temperature=temp)
+                tasks.append(task)
+                task_info.append((temp, i + 1, candidates_per_temp))
+        
+        total_tasks = len(tasks)
+        logger.info(f"총 {total_tasks}개 후보를 병렬로 생성 시작...")
+        
+        # 병렬 실행
+        try:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # 결과 처리 및 로깅
+            final_results = []
+            for i, (result, (temp, candidate_num, total_per_temp)) in enumerate(zip(results, task_info)):
+                if isinstance(result, Exception):
+                    logger.warning(f"  후보 생성 실패 (temp={temp}, {candidate_num}/{total_per_temp}): {str(result)}")
+                    final_results.append(f"[생성 실패: {str(result)}]")
+                else:
+                    logger.info(f"  후보 {i+1}: 생성 완료 (temp={temp}, {candidate_num}/{total_per_temp})")
+                    final_results.append(result)
+            
+            logger.info(f"병렬 생성 완료: 총 {len(final_results)}개 후보")
+            return final_results
+            
+        except Exception as e:
+            logger.error(f"병렬 생성 중 예기치 못한 오류: {str(e)}")
+            # 폴백: 순차 처리
+            logger.info("폴백: 순차 처리로 재시도...")
+            return await self._generate_sequential_fallback(prompt, temperatures, candidates_per_temp)
+    
+    async def _generate_sequential_fallback(
+        self, 
+        prompt: str, 
+        temperatures: List[float], 
+        candidates_per_temp: int
+    ) -> List[str]:
+        """병렬 처리 실패 시 순차 처리 폴백"""
         results = []
         
         for temp in temperatures:
-            logger.info(f"Temperature {temp}로 {candidates_per_temp}개 후보 생성 중...")
+            logger.info(f"Temperature {temp}로 {candidates_per_temp}개 후보 생성 중... (순차 처리)")
             
             for i in range(candidates_per_temp):
                 try:
@@ -111,7 +155,7 @@ class LLMClient:
                     logger.warning(f"  후보 생성 실패 (temp={temp}, {i+1}/{candidates_per_temp}): {str(e)}")
                     results.append(f"[생성 실패: {str(e)}]")
         
-        logger.info(f"총 {len(results)}개 후보 생성 완료")
+        logger.info(f"순차 처리 완료: 총 {len(results)}개 후보")
         return results
     
     async def select_best_candidate(self, selection_prompt: str, temperature: float = 0.1) -> int:

@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     external_analyzer_api_url: str = "https://ils.jp.ngrok.io/api/enhanced_analyze"
     
     # OpenAI API 설정
-    openai_api_key: str = ""
+    openai_api_key: str = os.getenv("OPENAI_API_KEY")
     openai_model: str = "gpt-4o"
     
     # 앱 설정

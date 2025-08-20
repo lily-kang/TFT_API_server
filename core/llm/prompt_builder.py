@@ -37,21 +37,17 @@ class PromptBuilder:
             구성된 프롬프트 문자열
         """
         try:
-            # 목표 범위 계산
-            if 'length' in problematic_metric.lower():
-                target_min = master.AVG_SENTENCE_LENGTH - tolerance_abs.AVG_SENTENCE_LENGTH
-                target_max = master.AVG_SENTENCE_LENGTH + tolerance_abs.AVG_SENTENCE_LENGTH
-                target_range_length = f"{target_min:.2f} - {target_max:.2f}"
-            else:
-                target_range_length = f"N/A"
+            # 목표 범위 계산 - 항상 두 지표 모두 계산
+            # 평균 문장 길이 목표 범위
+            target_min_length = master.AVG_SENTENCE_LENGTH - tolerance_abs.AVG_SENTENCE_LENGTH
+            target_max_length = master.AVG_SENTENCE_LENGTH + tolerance_abs.AVG_SENTENCE_LENGTH
+            target_range_length = f"{target_min_length:.2f} - {target_max_length:.2f}"
             
-            if 'clause' in problematic_metric.lower() or 'embedded' in problematic_metric.lower():
-                clause_tolerance = master.All_Embedded_Clauses_Ratio * tolerance_ratio.All_Embedded_Clauses_Ratio
-                target_min = master.All_Embedded_Clauses_Ratio - clause_tolerance
-                target_max = master.All_Embedded_Clauses_Ratio + clause_tolerance
-                target_range_clauses = f"{target_min:.3f} - {target_max:.3f}"
-            else:
-                target_range_clauses = f"N/A"
+            # 내포절 비율 목표 범위
+            clause_tolerance = master.All_Embedded_Clauses_Ratio * tolerance_ratio.All_Embedded_Clauses_Ratio
+            target_min_clauses = master.All_Embedded_Clauses_Ratio - clause_tolerance
+            target_max_clauses = master.All_Embedded_Clauses_Ratio + clause_tolerance
+            target_range_clauses = f"{target_min_clauses:.3f} - {target_max_clauses:.3f}"
             
             # 고정값 3으로 설정 (사용자 요청)
             fixed_num_modifications = 3
@@ -227,30 +223,6 @@ Do not include any explanation, JSON, or additional text. Just the number betwee
         except Exception as e:
             logger.error(f"문제 지표 결정 실패: {str(e)}")
             return None
-    
-    def calculate_modification_count(
-        self,
-        text: str,
-        problematic_metric: str,
-        current_value: float,
-        target_min: float,
-        target_max: float
-    ) -> int:
-        """
-        수정할 문장 수 계산 (고정값 3 반환)
-        
-        Args:
-            text: 분석할 텍스트
-            problematic_metric: 문제 지표명
-            current_value: 현재 값
-            target_min: 목표 최소값
-            target_max: 목표 최대값
-            
-        Returns:
-            수정할 문장 수 (고정값 3)
-        """
-        # 사용자 요청에 따라 고정값 3 반환
-        return 3
 
 
 # 전역 프롬프트 빌더 인스턴스

@@ -128,7 +128,12 @@ async def test_full_syntax_pipeline():
                 tolerance_abs=tolerance_abs,
                 tolerance_ratio=tolerance_ratio,
                 current_metrics=current_metrics_dict,
-                referential_clauses=""  # 빈 문자열로 설정
+                referential_clauses="""
+Noun Clauses: that they can visit, what people see, whether visitors come
+Relative Clauses: which means they erupt, that form over time, where people live
+Adverbial Clauses: when snow presses down, because it was cold, if you visit
+Coordinate Clauses: and they love nature, but summers are mild, so people visit
+"""  # 기본 참조용 절 정보 제공
             )
             
             syntax_time = time.time() - syntax_start_time
