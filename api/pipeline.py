@@ -1,10 +1,63 @@
 from fastapi import APIRouter, HTTPException
 from core.pipeline import batch_processor
-from models.request import BatchPipelineRequest
+from core.llm.syntax_fixer import syntax_fixer
+from models.request import BatchPipelineRequest, MasterMetrics, ToleranceAbs, ToleranceRatio
 from models.response import BatchPipelineResponse
 from utils.logging import logger
+from typing import Dict
 
 router = APIRouter(prefix="/pipeline", tags=["pipeline"])
+
+
+@router.post(
+    "/preview-prompt",
+    summary="구문 수정 프롬프트 미리보기",
+    description="LLM 호출 없이 구문 수정 프롬프트가 어떻게 구성되는지 미리 확인할 수 있습니다."
+)
+async def preview_syntax_prompt(
+    text: str,
+    master: MasterMetrics,
+    tolerance_abs: ToleranceAbs,
+    tolerance_ratio: ToleranceRatio,
+    current_metrics: Dict[str, float],
+    referential_clauses: str = ""
+):
+    """
+    구문 수정 프롬프트 미리보기 엔드포인트
+    
+    Args:
+        text: 수정할 텍스트
+        master: 마스터 지표
+        tolerance_abs: 절대값 허용 오차
+        tolerance_ratio: 비율 허용 오차
+        current_metrics: 현재 지표값들
+        referential_clauses: 참조용 절 정보
+        
+    Returns:
+        생성된 프롬프트 문자열
+    """
+    try:
+        logger.info(f"프롬프트 미리보기 요청 수신: {len(text)} 글자")
+        
+        # 프롬프트 미리보기 실행
+        prompt = await syntax_fixer.preview_prompt(
+            text, master, tolerance_abs, tolerance_ratio, 
+            current_metrics, referential_clauses
+        )
+        
+        return {
+            "prompt": prompt,
+            "prompt_length": len(prompt),
+            "text_length": len(text),
+            "status": "success"
+        }
+        
+    except Exception as e:
+        logger.error(f"프롬프트 미리보기 실패: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"프롬프트 미리보기 중 오류가 발생했습니다: {str(e)}"
+        )
 
 
 @router.post(

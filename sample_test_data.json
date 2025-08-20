@@ -1,0 +1,130 @@
+{
+  "test_cases": [
+    {
+      "case_id": "syntax_fail_case",
+      "description": "구문 지표가 허용 범위를 벗어난 경우",
+      "input": {
+        "client_id": "test_001",
+        "original_text": "Where can you find mountains, glaciers, and volcanoes? Alaska is the location you would visit. Alaska has different regions. In each part of the state, there are different features.\n\nLand Features\nThe tallest mountain in the United States is in Alaska. It is called Mt. McKinley. Some people go to Alaska just to climb it.\nAlaska also has the biggest glaciers in all of the United States. Glaciers are made when one layer of snow falls on top of another. The snowfall becomes very thick. It turns to ice. The growth of a glacier takes many years to form.\n\nTemperature Changes\nAlaska has different temperatures. Northern Alaska is called the Arctic region. The temperatures are much colder than inside your freezer. The ground, lakes, and rivers are almost always frozen.\nAs a result, most people live in the south of Alaska. It is warmer there. Crops grow well in the rich soil there.\nAnimals\nAlaska has many different animals. You may spot a walrus or polar bear among the glaciers. You can see a black or brown bear fishing in a river or stream. In another region, you can see a moose or caribou.\n\nDaylight and Darkness\nThe seasons are special here, too. In summer, people celebrate the mild temperate weather. These lively people also celebrate the sunlight because the sun does not set for many days. In one village, the sun doesn't set for more than 80 days! You might be in bed and still see the sun shining.\nIn winter, the sun doesn't rise in some places in Alaska. These places have more than 60 days of winter darkness. You could have afternoon soccer practice in the dark! You might think this would be eerie, but Alaskans don't think it is weird. They are used to the dark winter days.\nAlaska is a very interesting place to live!",
+        "title": "복잡한 구문 테스트",
+        "generated_passage": "Iceland is a country full of natural beauty. This unique location has waterfalls, hot springs, and even volcanoes. Some volcanoes are still active, which means they can still erupt with lava. People come from around the world to visit these places.\n\nIceland also has many glaciers. These rivers of ice form when one layer of snow presses down on another. Over many years, the snow turns into solid ice. The glaciers slowly move across the land, shaping it as they go.\n\nThe temperature in Iceland changes with the seasons. Winters can be cold, but summers are cool and mild. The darkness in winter lasts a long time in some parts of the country. In summer, people enjoy long days with lots of sunlight.\n\nPeople in Iceland are proud of their land. Their towns are small but lively, and they love to explore the outdoors. If you visit Iceland, you might see puffins, whales, or even the northern lights!",
+        "include_syntax": true,
+        "master": {
+          "AVG_SENTENCE_LENGTH": 8.85,
+          "All_Embedded_Clauses_Ratio": 0.176,
+          "CEFR_NVJD_A1A2_lemma_ratio": 0.583
+        },
+        "tolerance_abs": {
+          "AVG_SENTENCE_LENGTH": 1.97
+        },
+        "tolerance_ratio": {
+          "All_Embedded_Clauses_Ratio": 0.202,
+          "CEFR_NVJD_A1A2_lemma_ratio": 0.104
+        },
+        "syntax_candidates": 3,
+        "lexical_candidates": 3
+      },
+      "expected_flow": [
+        "analyze",
+        "fix_syntax",
+        "reanalyze_after_syntax"
+      ],
+      "expected_result": "final"
+    },
+    {
+      "case_id": "syntax_pass_case", 
+      "description": "구문 지표가 이미 허용 범위 내인 경우",
+      "input": {
+        "client_id": "test_002",
+        "original_text": "이것은 적절한 길이의 문장입니다. 구문 복잡도가 적당합니다.",
+        "title": "정상 구문 테스트",
+        "generated_passage": "이것은 적절한 길이의 문장입니다. 구문 복잡도가 적당합니다.",
+        "include_syntax": true,
+        "master": {
+          "AVG_SENTENCE_LENGTH": 11.0,
+          "All_Embedded_Clauses_Ratio": 0.15,
+          "CEFR_NVJD_A1A2_lemma_ratio": 0.65
+        },
+        "tolerance_abs": {
+          "AVG_SENTENCE_LENGTH": 3.0
+        },
+        "tolerance_ratio": {
+          "All_Embedded_Clauses_Ratio": 0.20,
+          "CEFR_NVJD_A1A2_lemma_ratio": 0.10
+        },
+        "syntax_candidates": 3,
+        "lexical_candidates": 3
+      },
+      "expected_flow": [
+        "analyze"
+      ],
+      "expected_result": "final"
+    },
+    {
+      "case_id": "syntax_extreme_case",
+      "description": "극도로 복잡한 구문의 경우",
+      "input": {
+        "client_id": "test_003", 
+        "original_text": "본 연구에서는 텍스트의 구문적 복잡도를 측정하고 이를 바탕으로 자동화된 수정 시스템을 구축하는 것이 목적이며, 이러한 시스템은 다양한 언어학적 지표들을 종합적으로 분석하여 텍스트의 가독성을 향상시키는 데 기여할 수 있을 것으로 기대되는 바, 특히 교육 분야에서의 활용 가능성이 높다고 판단됩니다.",
+        "title": "극복잡 구문 테스트",
+        "generated_passage": "본 연구에서는 텍스트의 구문적 복잡도를 측정하고 이를 바탕으로 자동화된 수정 시스템을 구축하는 것이 목적이며, 이러한 시스템은 다양한 언어학적 지표들을 종합적으로 분석하여 텍스트의 가독성을 향상시키는 데 기여할 수 있을 것으로 기대되는 바, 특히 교육 분야에서의 활용 가능성이 높다고 판단됩니다.",
+        "include_syntax": true,
+        "master": {
+          "AVG_SENTENCE_LENGTH": 8.0,
+          "All_Embedded_Clauses_Ratio": 0.10,
+          "CEFR_NVJD_A1A2_lemma_ratio": 0.70
+        },
+        "tolerance_abs": {
+          "AVG_SENTENCE_LENGTH": 1.0
+        },
+        "tolerance_ratio": {
+          "All_Embedded_Clauses_Ratio": 0.05,
+          "CEFR_NVJD_A1A2_lemma_ratio": 0.05
+        },
+        "syntax_candidates": 3,
+        "lexical_candidates": 3
+      },
+      "expected_flow": [
+        "analyze",
+        "fix_syntax",
+        "reanalyze_after_syntax"
+      ],
+      "expected_result": "syntax_fail or final"
+    }
+  ],
+  
+  "mock_responses": {
+    "analyzer_responses": {
+      "original_text": {
+        "metrics": {
+          "AVG_SENTENCE_LENGTH": 12.5,
+          "All_Embedded_Clauses_Ratio": 0.25,
+          "CEFR_NVJD_A1A2_lemma_ratio": 0.55,
+          "AVG_CONTENT_SYLLABLES": 2.3,
+          "CL_CEFR_B1B2C1C2_ratio": 0.20,
+          "PP_Weighted_Ratio": 1.4
+        }
+      },
+      "improved_text": {
+        "metrics": {
+          "AVG_SENTENCE_LENGTH": 8.9,
+          "All_Embedded_Clauses_Ratio": 0.18,
+          "CEFR_NVJD_A1A2_lemma_ratio": 0.58,
+          "AVG_CONTENT_SYLLABLES": 2.1,
+          "CL_CEFR_B1B2C1C2_ratio": 0.18,
+          "PP_Weighted_Ratio": 1.2
+        }
+      }
+    },
+    
+    "llm_candidates": {
+      "syntax_fixed": [
+        "Iceland has natural beauty. It has waterfalls and hot springs. Some volcanoes are still active. People visit from around the world. Iceland has many glaciers. These form when snow presses down. The snow turns into ice over years. The glaciers move across the land. Temperature changes with seasons. Winters are cold but summers are mild. Darkness lasts long in winter. Summer has long days with sunlight. People are proud of their land. Towns are small but lively. They explore outdoors. Visitors might see puffins and whales.",
+        "Iceland is beautiful. This country has waterfalls, hot springs, and volcanoes. Some volcanoes can erupt with lava. People come to visit these places. Iceland has glaciers too. These ice rivers form from pressed snow. Snow becomes solid ice over time. Glaciers move and shape the land. Iceland's temperature changes by season. Winter is cold. Summer is cool and mild. Winter brings long darkness. Summer brings long sunlight. People love their land. Small towns are lively. People explore nature. Visitors see puffins, whales, and northern lights.",
+        "Iceland is a country with natural beauty. It has waterfalls and hot springs. Volcanoes are found there too. Some are still active. People visit from everywhere. The country has many glaciers. Snow layers press together. This creates solid ice over years. Glaciers move slowly across land. Temperature varies by season. Winter brings cold weather. Summer is cool and mild. Winter has long darkness periods. Summer has long daylight hours. People take pride in their land. Towns are small yet lively. Outdoor exploration is popular. Visitors observe puffins, whales, and northern lights."
+      ]
+    },
+    
+    "llm_selection": "2"
+  }
+} 

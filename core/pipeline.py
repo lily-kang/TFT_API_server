@@ -114,8 +114,13 @@ class PipelineProcessor:
         """구문 수정 단계"""
         logger.info(f"구문 수정 시작: client_id={payload.client_id}")
         
+        # 현재 지표 분석
+        raw_analysis = await analyzer.analyze(text, payload.include_syntax)
+        current_metrics_obj = metrics_extractor.extract(raw_analysis)
+        current_metrics = current_metrics_obj.dict()
+        
         candidates, selected_text = await syntax_fixer.fix_syntax(
-            text, master, tolerance_abs, tolerance_ratio, payload.syntax_candidates
+            text, master, tolerance_abs, tolerance_ratio, current_metrics, "", payload.syntax_candidates
         )
         attempts.syntax += 1
         text = selected_text
@@ -148,8 +153,19 @@ class PipelineProcessor:
         """어휘 수정 단계"""
         logger.info(f"어휘 수정 시작: client_id={payload.client_id}")
         
+        # 현재 메트릭스 분석
+        raw_analysis = await analyzer.analyze(text, payload.include_syntax)
+        metrics = metrics_extractor.extract(raw_analysis)
+        
+        # 메트릭스를 딕셔너리로 변환
+        current_metrics = {
+            'avg_sentence_length': metrics.AVG_SENTENCE_LENGTH,
+            'embedded_clauses_ratio': metrics.All_Embedded_Clauses_Ratio,
+            'cefr_a1a2_ratio': metrics.CEFR_NVJD_A1A2_lemma_ratio
+        }
+        
         candidates, selected_text = await lexical_fixer.fix_lexical(
-            text, master, tolerance_ratio, payload.lexical_candidates
+            text, master, tolerance_ratio, current_metrics, n_candidates=payload.lexical_candidates
         )
         attempts.lexical += 1
         text = selected_text

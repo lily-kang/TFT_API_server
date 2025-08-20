@@ -1,6 +1,10 @@
 import os
 from typing import Dict, Any
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
+from dotenv import load_dotenv
+
+# .env 파일 자동 로드
+load_dotenv()
 
 
 class Settings(BaseSettings):
@@ -11,9 +15,9 @@ class Settings(BaseSettings):
     
     # OpenAI API 설정
     openai_api_key: str = ""
-    openai_model: str = "gpt-4"
+    openai_model: str = "gpt-4o"
     
-    # 서버 설정
+    # 앱 설정
     debug: bool = True
     log_level: str = "INFO"
     
@@ -22,14 +26,14 @@ class Settings(BaseSettings):
     default_lexical_candidates: int = 3
     pipeline_timeout: int = 300
     
-    # LLM Temperature 설정
-    llm_temperatures: list = [0.2, 0.3, 0.4]
+    # LLM 설정 - 구문 수정용 temperature (각 temperature별로 2개씩 생성)
+    llm_temperatures: list = [0.2, 0.3]
+    syntax_candidates_per_temperature: int = 2  # 각 temperature별 생성할 후보 수
     
-    # 기본 tolerance 값
+    # 기본 허용 오차 설정
     default_tolerance_abs: Dict[str, float] = {
         "AVG_SENTENCE_LENGTH": 1.97
     }
-    
     default_tolerance_ratio: Dict[str, float] = {
         "All_Embedded_Clauses_Ratio": 0.202,
         "CEFR_NVJD_A1A2_lemma_ratio": 0.104

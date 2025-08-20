@@ -1,6 +1,6 @@
 from typing import List
 from core.llm.client import llm_client
-from config.prompts import CANDIDATE_SELECTION_PROMPT
+from core.llm.prompt_builder import prompt_builder
 from utils.exceptions import LLMAPIError
 from utils.logging import logger
 
@@ -28,19 +28,8 @@ class CandidateSelector:
             if len(candidates) == 1:
                 return candidates[0]
             
-            # 최대 3개까지만 처리
-            candidates = candidates[:3]
-            
-            # 후보가 부족한 경우 첫 번째 후보로 채우기
-            while len(candidates) < 3:
-                candidates.append(candidates[0])
-            
             # 선택 프롬프트 준비
-            prompt = CANDIDATE_SELECTION_PROMPT.format(
-                candidate_1=candidates[0],
-                candidate_2=candidates[1],
-                candidate_3=candidates[2]
-            )
+            prompt = prompt_builder.build_selection_prompt(candidates)
             
             # LLM으로 선택
             selected_index = await llm_client.select_best_candidate(prompt)

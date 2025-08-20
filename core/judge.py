@@ -79,21 +79,14 @@ class MetricsJudge:
                 "is_pass": lexical_pass
             }
             
-            # 기타 지표들도 추가 (상세 결과용)
-            if metrics.AVG_CONTENT_SYLLABLES is not None:
-                detailed_metrics["AVG_CONTENT_SYLLABLES"] = {
-                    "current_value": metrics.AVG_CONTENT_SYLLABLES,
-                    "is_pass": True  # 기본적으로 통과로 처리
-                }
-            
-            # 구문/어휘 통과 여부 결정
+            # 전체 평가 결과
             syntax_pass = "PASS" if (length_pass and clause_pass) else "FAIL"
             lexical_pass = "PASS" if lexical_pass else "FAIL"
             
             result = EvaluationResult(
                 syntax_pass=syntax_pass,
                 lexical_pass=lexical_pass,
-                detailed_metrics=detailed_metrics
+                details=detailed_metrics
             )
             
             logger.info(f"지표 평가 완료: 구문={syntax_pass}, 어휘={lexical_pass}")

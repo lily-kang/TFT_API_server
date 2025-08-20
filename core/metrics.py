@@ -2,6 +2,7 @@ from typing import Dict, Any
 from models.internal import MetricsData
 from utils.exceptions import MetricsExtractionError
 from utils.logging import logger
+import json
 
 
 class MetricsExtractor:
@@ -21,20 +22,92 @@ class MetricsExtractor:
             MetricsExtractionError: 지표 추출 실패 시
         """
         try:
-            # TODO: 실제 외부 API 응답 구조에 맞게 수정 필요
-            # 현재는 예상 구조로 작성
-            metrics_data = raw_analysis.get("metrics", {})
+            logger.info("="*60)
+            logger.info("📊 분석기 API 응답 상세 로깅 시작")
+            logger.info("="*60)
             
+            # 전체 응답 구조 로깅
+            # logger.info(f"🔍 전체 응답 키: {list(raw_analysis.keys())}")
+            
+            # 실제 API 응답 구조에 맞게 수정
+            data = raw_analysis.get("data", {})
+            # logger.info(f"📋 data 키: {list(data.keys())}")
+            
+            text_statistics = data.get("text_statistics", {})
+            # logger.info(f"📈 text_statistics 키: {list(text_statistics.keys())}")
+            
+            # 1. 평균 문장 길이
+            logger.info("\n" + "="*40)
+            logger.info("📏 1. 평균 문장 길이 추출")
+            logger.info("="*40)
+            
+            basic_overview = text_statistics.get("table_01_basic_overview", {})
+            # logger.info(f"🔍 table_01_basic_overview 전체 내용:")
+            # logger.info(json.dumps(basic_overview, indent=2, ensure_ascii=False))
+            
+            avg_sentence_length = basic_overview.get("avg_sentence_length", 0.0)
+            sentence_count = basic_overview.get("sentence_count", 1)
+            logger.info(f"✅ avg_sentence_length: {avg_sentence_length}")
+            logger.info(f"✅ sentence_count: {sentence_count}")
+            
+            # 2. 내포절 비율 계산
+            logger.info("\n" + "="*40)
+            logger.info("🔗 2. 내포절 비율 계산")
+            logger.info("="*40)
+            
+            syntax_analysis = text_statistics.get("table_10_syntax_analysis", {})
+            # logger.info(f"🔍 table_10_syntax_analysis 전체 내용:")
+            # logger.info(json.dumps(syntax_analysis, indent=2, ensure_ascii=False))
+            
+            adverbial_sentences = syntax_analysis.get("adverbial_clause_sentences", 0)
+            coordinate_sentences = syntax_analysis.get("coordinate_clause_sentences", 0)
+            nominal_sentences = syntax_analysis.get("nominal_clause_sentences", 0)
+            relative_sentences = syntax_analysis.get("relative_clause_sentences", 0)
+            
+            # logger.info(f"📊 adverbial_clause_sentences: {adverbial_sentences}")
+            # logger.info(f"📊 coordinate_clause_sentences: {coordinate_sentences}")
+            # logger.info(f"📊 nominal_clause_sentences: {nominal_sentences}")
+            # logger.info(f"📊 relative_clause_sentences: {relative_sentences}")
+            
+            total_clause_sentences = adverbial_sentences + coordinate_sentences + nominal_sentences + relative_sentences
+            all_embedded_clauses_ratio = total_clause_sentences / sentence_count if sentence_count > 0 else 0.0
+            
+            logger.info(f"📈 총 절 문장 수: {total_clause_sentences}")
+            logger.info(f"📈 전체 문장 수: {sentence_count}")
+            logger.info(f"✅ All_Embedded_Clauses_Ratio: {all_embedded_clauses_ratio}")
+            
+            # 3. CEFR A1A2 어휘 비율
+            logger.info("\n" + "="*40)
+            logger.info("📚 3. CEFR_NVJD_lemma_A1A2 어휘 비율")
+            logger.info("="*40)
+            
+            lemma_metrics = text_statistics.get("table_11_lemma_metrics", {})
+            # logger.info(f"🔍 table_11_lemma_metrics 전체 내용:")
+            # logger.info(json.dumps(lemma_metrics, indent=2, ensure_ascii=False))
+            
+            cefr_a1_ratio = lemma_metrics.get("cefr_a1_NVJD_lemma_ratio", 0.0)
+            cefr_a2_ratio = lemma_metrics.get("cefr_a2_NVJD_lemma_ratio", 0.0)
+            cefr_a1a2_ratio = cefr_a1_ratio + cefr_a2_ratio
+            
+            # logger.info(f"📊 cefr_a1_NVJD_lemma_ratio: {cefr_a1_ratio}")
+            # logger.info(f"📊 cefr_a2_NVJD_lemma_ratio: {cefr_a2_ratio}")
+            logger.info(f"✅ CEFR_NVJD_A1A2_lemma_ratio: {cefr_a1a2_ratio}")
+            
+            # 최종 결과
             extracted = MetricsData(
-                AVG_SENTENCE_LENGTH=metrics_data.get("AVG_SENTENCE_LENGTH", 0.0),
-                All_Embedded_Clauses_Ratio=metrics_data.get("All_Embedded_Clauses_Ratio", 0.0),
-                CEFR_NVJD_A1A2_lemma_ratio=metrics_data.get("CEFR_NVJD_A1A2_lemma_ratio", 0.0),
-                AVG_CONTENT_SYLLABLES=metrics_data.get("AVG_CONTENT_SYLLABLES"),
-                CL_CEFR_B1B2C1C2_ratio=metrics_data.get("CL_CEFR_B1B2C1C2_ratio"),
-                PP_Weighted_Ratio=metrics_data.get("PP_Weighted_Ratio")
+                AVG_SENTENCE_LENGTH=float(avg_sentence_length),
+                All_Embedded_Clauses_Ratio=float(all_embedded_clauses_ratio),
+                CEFR_NVJD_A1A2_lemma_ratio=float(cefr_a1a2_ratio)
             )
             
-            logger.info(f"지표 추출 완료: {extracted}")
+            logger.info("\n" + "="*60)
+            logger.info("🎯 최종 추출된 지표")
+            logger.info("="*60)
+            logger.info(f"✅ AVG_SENTENCE_LENGTH: {extracted.AVG_SENTENCE_LENGTH}")
+            logger.info(f"✅ All_Embedded_Clauses_Ratio: {extracted.All_Embedded_Clauses_Ratio}")
+            logger.info(f"✅ CEFR_NVJD_A1A2_lemma_ratio: {extracted.CEFR_NVJD_A1A2_lemma_ratio}")
+            logger.info("="*60)
+            
             return extracted
             
         except Exception as e:

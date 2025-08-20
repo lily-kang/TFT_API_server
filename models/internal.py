@@ -16,17 +16,17 @@ class MetricsData(BaseModel):
     All_Embedded_Clauses_Ratio: float
     CEFR_NVJD_A1A2_lemma_ratio: float
     # 기타 지표들도 포함할 수 있음
-    AVG_CONTENT_SYLLABLES: Optional[float] = None
-    CL_CEFR_B1B2C1C2_ratio: Optional[float] = None
-    PP_Weighted_Ratio: Optional[float] = None
+    # AVG_CONTENT_SYLLABLES: Optional[float] = None
+    # CL_CEFR_B1B2C1C2_ratio: Optional[float] = None
+    # PP_Weighted_Ratio: Optional[float] = None
 
 
 class EvaluationResult(BaseModel):
     """지표 평가 결과"""
-    syntax_pass: str  # "PASS" or "FAIL"
-    lexical_pass: str  # "PASS" or "FAIL"
-    detailed_metrics: Dict[str, Dict]  # 지표별 상세 정보
-    
+    syntax_pass: str  # "PASS" 또는 "FAIL"
+    lexical_pass: str  # "PASS" 또는 "FAIL" 
+    details: Dict[str, Dict]  # 지표별 상세 평가 결과
+
 
 @dataclass
 class ToleranceRange:
@@ -43,7 +43,7 @@ class LLMCandidate(BaseModel):
     """LLM 생성 후보"""
     text: str
     temperature: float
-    reasoning: Optional[str] = None
+    index: int
 
 
 class LLMResponse(BaseModel):

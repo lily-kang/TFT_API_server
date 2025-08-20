@@ -1,7 +1,7 @@
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 from core.llm.client import llm_client
 from core.llm.selector import CandidateSelector
-from config.prompts import LEXICAL_FIXING_PROMPT
+from core.llm.prompt_builder import prompt_builder
 from config.settings import settings
 from models.request import MasterMetrics, ToleranceRatio
 from utils.exceptions import LLMAPIError
@@ -20,6 +20,7 @@ class LexicalFixer:
         text: str,
         master: MasterMetrics,
         tolerance_ratio: ToleranceRatio,
+        current_metrics: Dict[str, float],
         n_candidates: int = 3
     ) -> Tuple[List[str], str]:
         """
@@ -41,7 +42,7 @@ class LexicalFixer:
             logger.info(f"어휘 수정 시작: {len(text)} 글자")
             
             # 프롬프트 준비
-            prompt = self._prepare_prompt(text, master, tolerance_ratio)
+            prompt = prompt_builder.build_lexical_prompt(text, master, tolerance_ratio, current_metrics)
             
             # 여러 temperature로 후보 생성
             temperatures = self.temperatures[:n_candidates]
@@ -57,25 +58,7 @@ class LexicalFixer:
             logger.error(f"어휘 수정 실패: {str(e)}")
             raise LLMAPIError(f"어휘 수정 중 오류 발생: {str(e)}")
     
-    def _prepare_prompt(
-        self,
-        text: str,
-        master: MasterMetrics,
-        tolerance_ratio: ToleranceRatio
-    ) -> str:
-        """어휘 수정 프롬프트 준비"""
-        
-        # 허용 범위 계산
-        lexical_tolerance = master.CEFR_NVJD_A1A2_lemma_ratio * tolerance_ratio.CEFR_NVJD_A1A2_lemma_ratio
-        lexical_min = master.CEFR_NVJD_A1A2_lemma_ratio - lexical_tolerance
-        lexical_max = master.CEFR_NVJD_A1A2_lemma_ratio + lexical_tolerance
-        
-        return LEXICAL_FIXING_PROMPT.format(
-            original_text=text,
-            target_lexical_ratio=master.CEFR_NVJD_A1A2_lemma_ratio,
-            min_lexical=lexical_min,
-            max_lexical=lexical_max
-        )
+
 
 
 # 전역 어휘 수정기 인스턴스
