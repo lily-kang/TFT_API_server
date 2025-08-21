@@ -21,6 +21,7 @@ class MetricsExtractor:
         Raises:
             MetricsExtractionError: 지표 추출 실패 시
         """
+        
         try:
             logger.info("="*60)
             logger.info("📊 분석기 API 응답 상세 로깅 시작")
@@ -36,43 +37,37 @@ class MetricsExtractor:
             text_statistics = data.get("text_statistics", {})
             # logger.info(f"📈 text_statistics 키: {list(text_statistics.keys())}")
             
-            # 1. 평균 문장 길이
-            logger.info("\n" + "="*40)
-            logger.info("📏 1. 평균 문장 길이 추출")
-            logger.info("="*40)
-            
+            # 테이블 추출
             basic_overview = text_statistics.get("table_01_basic_overview", {})
-            # logger.info(f"🔍 table_01_basic_overview 전체 내용:")
-            # logger.info(json.dumps(basic_overview, indent=2, ensure_ascii=False))
+            table_02 = text_statistics.get("table_02_detailed_tokens", {})
+            syntax_analysis = text_statistics.get("table_10_syntax_analysis", {})
+            table_11 = text_statistics.get("table_11_lemma_metrics", {})
+            table_09 = text_statistics.get("table_09_pos_distribution", {})
             
+            # 1. 평균 문장 길이
             avg_sentence_length = basic_overview.get("avg_sentence_length", 0.0)
             sentence_count = basic_overview.get("sentence_count", 1)
             logger.info(f"✅ avg_sentence_length: {avg_sentence_length}")
             logger.info(f"✅ sentence_count: {sentence_count}")
             
             # lexical_tokens 추출 (t2 테이블에서)
-            table_02 = text_statistics.get("table_02_detailed_tokens", {})
             lexical_tokens = table_02.get("lexical_tokens", 0)
             logger.info(f"✅ lexical_tokens: {lexical_tokens}")
             
-            # 2. 내포절 비율 계산
-            logger.info("\n" + "="*40)
-            logger.info("🔗 2. 내포절 비율 계산")
-            logger.info("="*40)
             
-            syntax_analysis = text_statistics.get("table_10_syntax_analysis", {})
-            # logger.info(f"🔍 table_10_syntax_analysis 전체 내용:")
-            # logger.info(json.dumps(syntax_analysis, indent=2, ensure_ascii=False))
+            content_lemmas = table_02.get("content_lemmas", 0)
+            propn_lemma_count = table_09.get("propn_lemma_count", 0)
+            cefr_a1_count = table_11.get("cefr_a1_NVJD_lemma_count", 0)
+            cefr_a2_count = table_11.get("cefr_a2_NVJD_lemma_count", 0)
+            logger.info(f"📊 content_lemmas: {content_lemmas}, propn_count: {propn_lemma_count}")
+            logger.info(f"📊 A1_count: {cefr_a1_count}, A2_count: {cefr_a2_count}")
             
+            # 2. 내포절 비율 추출
+
             adverbial_sentences = syntax_analysis.get("adverbial_clause_sentences", 0)
             coordinate_sentences = syntax_analysis.get("coordinate_clause_sentences", 0)
             nominal_sentences = syntax_analysis.get("nominal_clause_sentences", 0)
             relative_sentences = syntax_analysis.get("relative_clause_sentences", 0)
-            
-            # logger.info(f"📊 adverbial_clause_sentences: {adverbial_sentences}")
-            # logger.info(f"📊 coordinate_clause_sentences: {coordinate_sentences}")
-            # logger.info(f"📊 nominal_clause_sentences: {nominal_sentences}")
-            # logger.info(f"📊 relative_clause_sentences: {relative_sentences}")
             
             total_clause_sentences = adverbial_sentences + coordinate_sentences + nominal_sentences + relative_sentences
             all_embedded_clauses_ratio = total_clause_sentences / sentence_count if sentence_count > 0 else 0.0
@@ -86,12 +81,12 @@ class MetricsExtractor:
             logger.info("📚 3. CEFR_NVJD_lemma_A1A2 어휘 비율")
             logger.info("="*40)
             
-            lemma_metrics = text_statistics.get("table_11_lemma_metrics", {})
+            
             # logger.info(f"🔍 table_11_lemma_metrics 전체 내용:")
             # logger.info(json.dumps(lemma_metrics, indent=2, ensure_ascii=False))
             
-            cefr_a1_ratio = lemma_metrics.get("cefr_a1_NVJD_lemma_ratio", 0.0)
-            cefr_a2_ratio = lemma_metrics.get("cefr_a2_NVJD_lemma_ratio", 0.0)
+            cefr_a1_ratio = table_11.get("cefr_a1_NVJD_lemma_ratio", 0.0)
+            cefr_a2_ratio = table_11.get("cefr_a2_NVJD_lemma_ratio", 0.0)
             cefr_a1a2_ratio = cefr_a1_ratio + cefr_a2_ratio
             
             # logger.info(f"📊 cefr_a1_NVJD_lemma_ratio: {cefr_a1_ratio}")

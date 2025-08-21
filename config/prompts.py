@@ -146,21 +146,20 @@ SYNTAX_FIXING_PROMPT = """
     Your response must contain ONLY the complete, final revised text. Your entire output should be only the revised text, starting with its first word and ending with its last punctuation mark.
 """
 
-# 어휘 수정 프롬프트 (작성 중이라고 했으므로 기본 템플릿만 제공)
-LEXICAL_FIXING_PROMPT = """
+# 어휘 수정 프롬프트 
+#--- 프롬프트 A: A1/A2 비율을 '낮추기' 위한 프롬프트 (A1/A2 → B1/B2) ---
+LEXICAL_FIXING_PROMPT_DECREASE = """
 # Input Data
 ## 1. Text to Analyze
-${originalText}
+${var_generated_passage}
 ## 2. Processed Vocab Profile
-${processedProfile}
+${var_cefr_breakdown} 
 ## 3. Minimum Number of Modifications
-${totalModifications} word(s)`;
----
+${var_num_modifications} word(s)
+## 4. Target Level
+${var_target_level}
 
-// ---------------------------------------------------------------------------------
-// --- 프롬프트 A: A1/A2 비율을 '낮추기' 위한 프롬프트 (A1/A2 → B1/B2) ---
-// ---------------------------------------------------------------------------------
-const SYSTEM_PROMPT_DECREASE_RATIO = `You are a Text Editor AI. Your task is to make a text more lexically advanced by replacing simple words with more challenging ones. You will be given a text and a processed vocabulary profile.
+You are a Text Editor AI. Your task is to make a text more lexically advanced by replacing simple words with more challenging ones. You will be given a text and a processed vocabulary profile.
 
 # Your Goal
 - Make the text more lexically advanced.
@@ -189,11 +188,21 @@ Each object must contain exactly four keys:
 * \`replacement_level\`: The estimated CEFR level of the new word.
 Example of the required format:
 [ { "original_word": "safe", "original_level": "A2", "replacement_word": "secure", "replacement_level": "B2" } ]`;
+"""
 
-// ---------------------------------------------------------------------------------
-// --- 프롬프트 B: A1/A2 비율을 '높이기' 위한 프롬프트 (B1+ → A1/A2) ---
-// ---------------------------------------------------------------------------------
-const SYSTEM_PROMPT_INCREASE_RATIO = `You are a Text Editor AI. Your task is to make a text more lexically simple. You will be given a text and a processed vocabulary profile.
+# --- 프롬프트 B: A1/A2 비율을 '높이기' 위한 프롬프트 (B1+ → A1/A2) ---
+LEXICAL_FIXING_PROMPT_INCREASE = """
+# Input Data
+## 1. Text to Analyze
+${var_generated_passage}
+## 2. Processed Vocab Profile
+${var_cefr_breakdown} 
+## 3. Minimum Number of Modifications
+${var_num_modifications} word(s)
+## 4. Target Level
+${var_target_level}
+
+You are a Text Editor AI. Your task is to make a text more lexically simple. You will be given a text and a processed vocabulary profile.
 
 # Your Goal
 - Make the text simpler by reducing its lexical difficulty.
@@ -223,27 +232,9 @@ Each object must contain exactly four keys:
 * \`replacement_word\`: The suggested new word.
 * \`replacement_level\`: The estimated CEFR level of the new word.
 Example of the required format:
-[ { "original_word": "glowed", "original_level": "C2", "replacement_word": "shone", "replacement_level": "A2" } ]`;
-
-// ---------------------------------------------------------------------------------
-// --- 프롬프트 C: '계획'을 실제 지문에 '적용'하기 위한 시스템 프롬프트 ---
-// ---------------------------------------------------------------------------------
-const SYSTEM_PROMPT_TEXT_REVISION = `You are a meticulous text editor. Your task is to revise a given text based on a specific JSON array of word replacements. You must apply the changes flawlessly while maintaining grammatical integrity.
-# Input
-You will receive:
-1.  The original text.
-2.  A JSON array detailing the words to replace. Each object has an "original_word" and a "replacement_word".
-# Core Instructions
-1.  **Apply All Changes:** Replace every occurrence of each "original_word" with its corresponding "replacement_word".
-2.  **Maintain Grammatical Correctness:** This is your most important duty.
-    * **Verb Tense/Form:** The replacement verb MUST match the tense and form of the original verb. (e.g., if the original is "glowed" (past), the replacement "shine" must be changed to "shone").
-    * **Plurals:** If a noun is plural, the replacement must also be plural.
-    * **Sentence Structure:** If a change affects the grammar, you must make minor adjustments to the sentence, like adding a preposition, to keep it correct.
-3.  **Contextual Consistency:** The JSON plan assumes the replacement word is appropriate for all occurrences. Your task is to apply it consistently.
-# Output
-Your output MUST be the full, revised text ONLY. Do not include any explanations, comments, or markdown formatting.`;
-
+[ { "original_word": "glowed", "original_level": "C2", "replacement_word": "shone", "replacement_level": "A2" } ]
 """
+
 
 # 최적 지문 선택 프롬프트
 CANDIDATE_SELECTION_PROMPT = """

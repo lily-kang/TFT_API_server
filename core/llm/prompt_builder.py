@@ -1,13 +1,49 @@
 """프롬프트 템플릿 빌더"""
 
+import math
+import json
 from typing import Dict, Any, Optional, List
 from models.request import MasterMetrics, ToleranceAbs, ToleranceRatio
-from config.prompts import SYNTAX_FIXING_PROMPT, LEXICAL_FIXING_PROMPT, CANDIDATE_SELECTION_PROMPT
+from config.prompts import SYNTAX_FIXING_PROMPT, LEXICAL_FIXING_PROMPT_DECREASE, LEXICAL_FIXING_PROMPT_INCREASE, CANDIDATE_SELECTION_PROMPT
 from utils.logging import logger
 
 
 class PromptBuilder:
     """LLM 프롬프트 구성 클래스"""
+    
+    def format_cefr_breakdown(self, cefr_breakdown: Any) -> str:
+        """
+        CEFR breakdown 객체를 프롬프트용 문자열로 변환
+        
+        Args:
+            cefr_breakdown: CEFR breakdown 객체 (dict, list, 또는 기타 구조)
+            
+        Returns:
+            프롬프트에 사용할 문자열
+        """
+        try:
+            if isinstance(cefr_breakdown, str):
+                # 이미 문자열이면 그대로 반환
+                return cefr_breakdown
+            elif isinstance(cefr_breakdown, dict):
+                # 딕셔너리인 경우 보기 좋게 포맷팅
+                formatted_lines = []
+                for level, words in cefr_breakdown.items():
+                    if isinstance(words, list):
+                        word_list = ", ".join(words)
+                        formatted_lines.append(f"{level}: {word_list}")
+                    else:
+                        formatted_lines.append(f"{level}: {words}")
+                return "\n".join(formatted_lines)
+            elif isinstance(cefr_breakdown, list):
+                # 리스트인 경우 JSON 형태로 변환
+                return json.dumps(cefr_breakdown, indent=2, ensure_ascii=False)
+            else:
+                # 기타 객체인 경우 JSON으로 변환 시도
+                return json.dumps(cefr_breakdown, indent=2, ensure_ascii=False, default=str)
+        except Exception as e:
+            logger.warning(f"CEFR breakdown 변환 실패: {str(e)}, 원본 반환")
+            return str(cefr_breakdown)
     
     def build_syntax_prompt(
         self,
@@ -81,7 +117,11 @@ class PromptBuilder:
         text: str,
         master: MasterMetrics,
         tolerance_ratio: ToleranceRatio,
-        current_metrics: Dict[str, float]
+        current_metrics: Dict[str, float],
+        cefr_breakdown: Any = None,
+        target_level: str,
+        prompt_type: str,  # "INCREASE" or "DECREASE"
+        num_modifications: int = 3
     ) -> str:
         """
         어휘 수정용 프롬프트 구성
@@ -91,30 +131,44 @@ class PromptBuilder:
             master: 마스터 지표
             tolerance_ratio: 비율 허용 오차
             current_metrics: 현재 지표값들
+            cefr_breakdown: CEFR 어휘 분석 결과
+            target_level: 목표 어휘 레벨 (A1/A2 또는 B1/B2)
+            prompt_type: 프롬프트 타입 ("INCREASE" 또는 "DECREASE")
+            num_modifications: 수정할 어휘 개수
             
         Returns:
             구성된 프롬프트 문자열
         """
         try:
-            # 어휘 목표 범위 계산
-            lexical_tolerance = master.CEFR_NVJD_A1A2_lemma_ratio * tolerance_ratio.CEFR_NVJD_A1A2_lemma_ratio
-            min_lexical = master.CEFR_NVJD_A1A2_lemma_ratio - lexical_tolerance
-            max_lexical = master.CEFR_NVJD_A1A2_lemma_ratio + lexical_tolerance
+            # CEFR breakdown 객체를 문자열로 변환
+            cefr_breakdown_str = self.format_cefr_breakdown(cefr_breakdown) if cefr_breakdown else ""
             
-            # 프롬프트 변수 매핑
+            # 프롬프트 템플릿 선택
+            if prompt_type == "DECREASE":
+                # A1A2 비율을 낮춰야 함 (A1/A2 → B1/B2)
+                template = LEXICAL_FIXING_PROMPT_DECREASE
+                logger.info("DECREASE 프롬프트 템플릿 선택 (A1/A2 → B1/B2)")
+            elif prompt_type == "INCREASE":
+                # A1A2 비율을 높여야 함 (B1+ → A1/A2)
+                template = LEXICAL_FIXING_PROMPT_INCREASE
+                logger.info("INCREASE 프롬프트 템플릿 선택 (B1+ → A1/A2)")
+            else:
+                raise ValueError(f"지원하지 않는 prompt_type: {prompt_type}. 'INCREASE' 또는 'DECREASE'여야 합니다.")
+            
+            # 프롬프트 변수 매핑 (템플릿에 맞춘 변수명 사용)
             prompt_vars = {
-                'original_text': text,
-                'target_lexical_ratio': f"{master.CEFR_NVJD_A1A2_lemma_ratio:.3f}",
-                'min_lexical': f"{min_lexical:.3f}",
-                'max_lexical': f"{max_lexical:.3f}"
+                'var_generated_passage': text,
+                'var_cefr_breakdown': cefr_breakdown_str,
+                'var_num_modifications': str(num_modifications),
+                'var_target_level': target_level
             }
             
             # 프롬프트 템플릿에 변수 삽입
-            prompt = LEXICAL_FIXING_PROMPT
+            prompt = template
             for var_name, var_value in prompt_vars.items():
-                prompt = prompt.replace(f"{{{var_name}}}", str(var_value))
+                prompt = prompt.replace(f"${{{var_name}}}", str(var_value))
             
-            logger.info(f"어휘 수정 프롬프트 생성 완료")
+            logger.info(f"어휘 수정 프롬프트 생성 완료 ({prompt_type})")
             return prompt
             
         except Exception as e:
@@ -305,6 +359,61 @@ Do not include any explanation, JSON, or additional text. Just the number betwee
             logger.error(f"수정 문장 수 계산 실패: {str(e)}")
             return 3  # 기본값 반환
 
+    def calculate_lexical_modification_count(
+        self,
+        current_ratio: float,
+        target_min: float,
+        target_max: float,
+        analysis_result: Dict[str, Any]
+    ) -> int:
+        """
+        CEFR A1~A2 NVJD 비율이 기준을 벗어났을 때 조정해야 할 어휘 수 계산
+
+        Args:
+            current_ratio: 현재 A1~A2 어휘 비율
+            target_min: 목표 최소 비율 (ex: 0.571)
+            target_max: 목표 최대 비율 (ex: 0.703)
+            analysis_result: {
+                'content_lemmas': 전체 content lemma 수 (table_02_detailed_tokens),
+                'propn_lemma_count': 고유명사 수 (table_09_pos_distribution),
+                'cefr_a1_NVJD_lemma_count': A1 수준 NVJD 어휘 수 (table_11_lemma_metrics),
+                'cefr_a2_NVJD_lemma_count': A2 수준 NVJD 어휘 수 (table_11_lemma_metrics)
+            }
+
+        Returns:
+            int: 조정이 필요한 어휘 수 (1개 이상)
+        """
+        try:
+            content_lemmas = analysis_result.get('content_lemmas', 0)
+            propn_lemma_count = analysis_result.get('propn_lemma_count', 0)
+            a1_count = analysis_result.get('cefr_a1_NVJD_lemma_count', 0)
+            a2_count = analysis_result.get('cefr_a2_NVJD_lemma_count', 0)
+
+            nvjd_total = content_lemmas - propn_lemma_count
+            a1a2_total = a1_count + a2_count
+
+            if nvjd_total == 0:
+                return 0
+
+            if target_min <= current_ratio <= target_max:
+                num_modifications = 0  # 기준 안에 있으면 조정 필요 없음
+            elif current_ratio < target_min:
+                # A1~A2 비율이 너무 낮음 → 더 추가해야 함
+                required = (target_min * nvjd_total) - a1a2_total
+                num_modifications = max(1, math.ceil(required))
+            else:
+                # A1~A2 비율이 너무 높음 → 줄여야 함
+                excess = a1a2_total - (target_max * nvjd_total)
+                num_modifications = max(1, math.ceil(excess))
+
+            logger.info(f"Lexical 수정 필요: 현재={current_ratio:.3f}, 목표=[{target_min:.3f}, {target_max:.3f}], "
+                        f"총수={nvjd_total}, A1A2={a1a2_total}, 조정={num_modifications}개")
+
+            return num_modifications
+
+        except Exception as e:
+            logger.error(f"Lexical 수정 수 계산 실패: {str(e)}")
+            return 3  # 예외 발생 시 기본값
 
 # 전역 프롬프트 빌더 인스턴스
 prompt_builder = PromptBuilder() 
