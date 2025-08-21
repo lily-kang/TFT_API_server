@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from api.pipeline import router as pipeline_router
+from api.router import router as pipeline_router
 from api.analyzer import router as analyzer_router
 from utils.logging import setup_logging
 from config.settings import settings
@@ -46,6 +46,6 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8000,
+        port=8510,
         reload=settings.debug
     )

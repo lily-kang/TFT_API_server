@@ -50,13 +50,13 @@ class PromptBuilder:
             target_range_clauses = f"{target_min_clauses:.3f} - {target_max_clauses:.3f}"
             
             # 고정값 3으로 설정 (사용자 요청)
-            fixed_num_modifications = 3
+            # fixed_num_modifications = 3
             
             # 프롬프트 변수 매핑
             prompt_vars = {
                 'var_Generated_Passage': text,
                 'var_problematic_metric': problematic_metric,
-                'var_num_modifications': str(fixed_num_modifications),  # 고정값 3
+                'var_num_modifications': str(num_modifications),  # 고정값 3
                 'var_current_value_avg_sentence_length': f"{current_metrics.get('avg_sentence_length', 0):.2f}",
                 'var_target_range_avg_sentence_length': target_range_length,
                 'var_current_value_embedded_clauses_ratio': f"{current_metrics.get('embedded_clauses_ratio', 0):.3f}",
@@ -69,7 +69,7 @@ class PromptBuilder:
             for var_name, var_value in prompt_vars.items():
                 prompt = prompt.replace(f"{{{var_name}}}", str(var_value))
             
-            logger.info(f"구문 수정 프롬프트 생성 완료 (문제 지표: {problematic_metric}, 수정 수: {fixed_num_modifications})")
+            logger.info(f"구문 수정 프롬프트 생성 완료 (문제 지표: {problematic_metric}, 수정 수: {num_modifications})")
             return prompt
             
         except Exception as e:
@@ -223,6 +223,87 @@ Do not include any explanation, JSON, or additional text. Just the number betwee
         except Exception as e:
             logger.error(f"문제 지표 결정 실패: {str(e)}")
             return None
+    
+    def calculate_modification_count(
+        self,
+        text: str,
+        problematic_metric: str,
+        current_value: float,
+        target_min: float,
+        target_max: float,
+        analysis_result: Dict[str, Any]
+    ) -> int:
+        """
+        수정할 문장 수 계산 (동적 계산)
+        
+        Args:
+            text: 분석할 텍스트
+            problematic_metric: 문제 지표명
+            current_value: 현재 값
+            target_min: 목표 최소값
+            target_max: 목표 최대값
+            analysis_result: 분석 결과 (sentence_count, lexical_tokens, clause 정보 등)
+            
+        Returns:
+            수정할 문장 수
+        """
+        try:
+            # 분석 결과에서 필요한 값들 추출
+            sentence_count = analysis_result.get('sentence_count', 0)
+            lexical_tokens = analysis_result.get('lexical_tokens', 0)
+            
+            # 복문 문장 수 총합 계산
+            adverbial_clause_sentences = analysis_result.get('adverbial_clause_sentences', 0)
+            coordinate_clause_sentences = analysis_result.get('coordinate_clause_sentences', 0)
+            nominal_clause_sentences = analysis_result.get('nominal_clause_sentences', 0)
+            relative_clause_sentences = analysis_result.get('relative_clause_sentences', 0)
+            
+            total_clause_sentences = (
+                adverbial_clause_sentences + 
+                coordinate_clause_sentences + 
+                nominal_clause_sentences + 
+                relative_clause_sentences
+            )
+            
+            if 'length' in problematic_metric.lower():
+                # 평균 문장 길이 관련 계산
+                if current_value > target_max:
+                    # 1. 평균문장길이가 기준보다 클 때
+                    upper_bound = target_max
+                    num_modifications = max(1, round((lexical_tokens / upper_bound) - sentence_count + 0.5))
+                else:
+                    # 2. 평균문장길이가 기준보다 작을 때
+                    lower_bound = target_min
+                    num_modifications = max(1, sentence_count - round(lexical_tokens / lower_bound))
+                    
+            elif 'clause' in problematic_metric.lower() or 'embedded' in problematic_metric.lower():
+                # 복문 비율 관련 계산
+                if current_value > target_max:
+                    # 3. 복문 비율이 기준보다 클 때
+                    target_ratio_upper = target_max
+                    num_modifications = max(1, round(
+                        (total_clause_sentences - (target_ratio_upper * sentence_count)) / 
+                        (1 + target_ratio_upper) + 0.5
+                    ))
+                else:
+                    # 4. 복문 비율이 기준보다 작을 때
+                    target_ratio_lower = target_min
+                    num_modifications = max(1, round(
+                        ((target_ratio_lower * sentence_count) - total_clause_sentences) / 
+                        (1 + target_ratio_lower) + 0.5
+                    ))
+            else:
+                # 기본값
+                num_modifications = 3
+            
+            logger.info(f"수정 문장 수 계산: {problematic_metric}, 현재값={current_value:.3f}, "
+                       f"목표범위=[{target_min:.3f}, {target_max:.3f}], 계산결과={num_modifications}개")
+            
+            return num_modifications
+            
+        except Exception as e:
+            logger.error(f"수정 문장 수 계산 실패: {str(e)}")
+            return 3  # 기본값 반환
 
 
 # 전역 프롬프트 빌더 인스턴스

@@ -50,6 +50,11 @@ class MetricsExtractor:
             logger.info(f"✅ avg_sentence_length: {avg_sentence_length}")
             logger.info(f"✅ sentence_count: {sentence_count}")
             
+            # lexical_tokens 추출 (t2 테이블에서)
+            table_02 = text_statistics.get("table_02_detailed_tokens", {})
+            lexical_tokens = table_02.get("lexical_tokens", 0)
+            logger.info(f"✅ lexical_tokens: {lexical_tokens}")
+            
             # 2. 내포절 비율 계산
             logger.info("\n" + "="*40)
             logger.info("🔗 2. 내포절 비율 계산")

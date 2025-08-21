@@ -69,17 +69,15 @@ class BatchPipelineRequest(BaseModel):
 class SyntaxFixRequest(BaseModel):
     """구문 수정 요청 모델 (단순화된 버전)"""
     request_id: str = Field(description="요청 ID (앱스크립트에서 관리)")
-    text: str = Field(description="수정할 텍스트")
+    text: str = Field(description="수정할 텍스트") 
     master: MasterMetrics = Field(description="마스터 지표")
-    tolerance_abs: Optional[ToleranceAbs] = Field(default=None, description="절대값 허용 오차")
-    tolerance_ratio: Optional[ToleranceRatio] = Field(default=None, description="비율 허용 오차")
     referential_clauses: str = Field(default="", description="참조용 절 정보")
 
 
-# 사전 정의된 일반적인 참조 절 모음
-DEFAULT_REFERENTIAL_CLAUSES = """
-Noun Clauses: that they can visit, what people see, whether visitors come
-Relative Clauses: which means they erupt, that form over time, where people live
-Adverbial Clauses: when snow presses down, because it was cold, if you visit
-Coordinate Clauses: and they love nature, but summers are mild, so people visit
-""" 
+
+
+class BatchSyntaxFixRequest(BaseModel):
+    """배치 구문 수정 요청 모델"""
+    request_id: str = Field(description="배치 요청 ID")
+    items: List[SyntaxFixRequest] = Field(description="구문 수정할 텍스트 리스트")
+    max_concurrent: Optional[int] = Field(default=10, description="최대 동시 처리 개수 (기본값: 10)") 

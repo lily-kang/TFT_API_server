@@ -70,24 +70,82 @@ class BatchPipelineResponse(BaseModel):
         } 
 
 
-class SyntaxFixResponse(BaseModel):
-    """구문 수정 응답 모델 (단순화된 버전)"""
-    request_id: str = Field(description="요청 ID")
+class StepResult(BaseModel):
+    """단계별 처리 결과 모델"""
+    step_name: str = Field(description="단계명")
     success: bool = Field(description="성공 여부")
+    processing_time: float = Field(description="처리 시간 (초)")
+    details: Optional[Dict[str, Any]] = Field(default=None, description="상세 정보")
+    error_message: Optional[str] = Field(default=None, description="에러 메시지")
+
+
+class SyntaxFixResponse(BaseModel):
+    """구문 수정 응답 모델 (단계별 진행 상황 포함)"""
+    request_id: str = Field(description="요청 ID")
+    overall_success: bool = Field(description="전체 성공 여부")
+    
+    # 최종 결과
     original_text: str = Field(description="원본 텍스트")
-    fixed_text: Optional[str] = Field(default=None, description="수정된 텍스트")
+    final_text: Optional[str] = Field(default=None, description="최종 수정된 텍스트")
+    revision_success: bool = Field(default=False, description="최종 수정 성공 여부")
+    
+    # 단계별 결과 (1단계: 원본 분석, 2단계: 구문 수정, 3단계: 어휘 수정)
+    step_results: List[StepResult] = Field(description="단계별 처리 결과")
     
     # 지표 정보
     original_metrics: Optional[Dict[str, float]] = Field(default=None, description="원본 지표")
-    fixed_metrics: Optional[Dict[str, float]] = Field(default=None, description="수정 후 지표")
+    final_metrics: Optional[Dict[str, float]] = Field(default=None, description="최종 지표")
     
     # 처리 정보
     candidates_generated: int = Field(default=0, description="생성된 후보 수")
     candidates_passed: int = Field(default=0, description="통과한 후보 수")
-    processing_time: float = Field(description="처리 시간 (초)")
+    total_processing_time: float = Field(description="총 처리 시간 (초)")
     
     # 에러 정보
-    error_message: Optional[str] = Field(default=None, description="에러 메시지")
+    error_message: Optional[str] = Field(default=None, description="전체 에러 메시지")
     
-    # 상세 정보 (옵션)
-    detailed_metrics: Optional[Dict[str, Any]] = Field(default=None, description="상세 지표 정보") 
+    class Config:
+        schema_extra = {
+            "example": {
+                "request_id": "req_123",
+                "overall_success": True,
+                "original_text": "원본 텍스트입니다.",
+                "final_text": "수정된 텍스트입니다.",
+                "revision_success": True,
+                "step_results": [
+                    {
+                        "step_name": "원본 분석",
+                        "success": True,
+                        "processing_time": 2.5,
+                        "details": {"syntax_pass": "FAIL", "lexical_pass": "PASS"}
+                    },
+                    {
+                        "step_name": "구문 수정",
+                        "success": True,
+                        "processing_time": 15.3,
+                        "details": {"candidates_generated": 4, "candidates_passed": 2}
+                    },
+                    {
+                        "step_name": "어휘 수정",
+                        "success": False,
+                        "processing_time": 0.0,
+                        "error_message": "어휘 수정은 현재 구현되지 않음"
+                    }
+                ],
+                "candidates_generated": 4,
+                "candidates_passed": 2,
+                "total_processing_time": 17.8
+            }
+        } 
+
+
+class BatchSyntaxFixResponse(BaseModel):
+    """배치 구문 수정 응답 모델"""
+    request_id: str = Field(description="배치 요청 ID")
+    overall_success: bool = Field(description="전체 성공 여부")
+    total_items: int = Field(description="총 처리 항목 수")
+    successful_items: int = Field(description="성공한 항목 수")
+    failed_items: int = Field(description="실패한 항목 수")
+    results: List[SyntaxFixResponse] = Field(description="각 항목별 처리 결과")
+    total_processing_time: float = Field(description="총 처리 시간 (초)")
+    error_message: Optional[str] = Field(default=None, description="전체 에러 메시지") 
