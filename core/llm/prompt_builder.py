@@ -318,19 +318,33 @@ Do not include any explanation, JSON, or additional text. Just the number betwee
                 relative_clause_sentences
             )
 
+            logger.info(f"🔍 수정 문장 수 계산 상세:")
+            logger.info(f"  - sentence_count: {sentence_count}")
+            logger.info(f"  - lexical_tokens: {lexical_tokens}")
+            logger.info(f"  - total_clause_sentences: {total_clause_sentences}")
+            logger.info(f"  - problematic_metric: {problematic_metric}")
+            logger.info(f"  - current_value: {current_value:.3f}")
+            logger.info(f"  - target_min: {target_min:.3f}, target_max: {target_max:.3f}")
+
             # 평균 문장 길이 판단
             if 'length' in problematic_metric.lower():
+                logger.info(f"📏 평균 문장 길이 계산 시작")
                 if current_value > target_max:
                     # 평균 문장 길이가 기준보다 큼 → 문장 수 늘려야 함
                     upper_bound = target_max
                     num_modifications = math.ceil((lexical_tokens / upper_bound) - sentence_count)
+                    logger.info(f"  - 현재값({current_value:.3f}) > 최대값({target_max:.3f})")
+                    logger.info(f"  - 계산: ceil(({lexical_tokens} / {upper_bound:.3f}) - {sentence_count}) = {num_modifications}")
                 else:
                     # 평균 문장 길이가 기준보다 작음 → 문장 수 줄여야 함
                     lower_bound = target_min
                     num_modifications = math.floor(sentence_count - (lexical_tokens / lower_bound))
+                    logger.info(f"  - 현재값({current_value:.3f}) < 최소값({target_min:.3f})")
+                    logger.info(f"  - 계산: floor({sentence_count} - ({lexical_tokens} / {lower_bound:.3f})) = {num_modifications}")
 
             # 복문 비율 판단
             elif 'clause' in problematic_metric.lower() or 'embedded' in problematic_metric.lower():
+                logger.info(f"🔗 복문 비율 계산 시작")
                 if current_value > target_max:
                     # 복문 비율이 기준보다 큼 → 복문 줄여야 함
                     target_ratio_upper = target_max
@@ -338,6 +352,8 @@ Do not include any explanation, JSON, or additional text. Just the number betwee
                         (total_clause_sentences - (target_ratio_upper * sentence_count)) / 
                         (1 + target_ratio_upper)
                     )
+                    logger.info(f"  - 현재값({current_value:.3f}) > 최대값({target_max:.3f})")
+                    logger.info(f"  - 계산: ceil(({total_clause_sentences} - ({target_ratio_upper:.3f} * {sentence_count})) / (1 + {target_ratio_upper:.3f})) = {num_modifications}")
                 else:
                     # 복문 비율이 기준보다 작음 → 복문 늘려야 함
                     target_ratio_lower = target_min
@@ -345,14 +361,15 @@ Do not include any explanation, JSON, or additional text. Just the number betwee
                         ((target_ratio_lower * sentence_count) - total_clause_sentences) / 
                         (1 + target_ratio_lower)
                     )
+                    logger.info(f"  - 현재값({current_value:.3f}) < 최소값({target_min:.3f})")
+                    logger.info(f"  - 계산: ceil((({target_ratio_lower:.3f} * {sentence_count}) - {total_clause_sentences}) / (1 + {target_ratio_lower:.3f})) = {num_modifications}")
 
             else:
                 # 지정되지 않은 메트릭 → 기본값
                 num_modifications = 3
+                logger.info(f"⚠️  지정되지 않은 메트릭: {problematic_metric}, 기본값 3 사용")
 
-            logger.info(f"수정 문장 수 계산: {problematic_metric}, 현재값={current_value:.3f}, "
-                        f"목표범위=[{target_min:.3f}, {target_max:.3f}], 계산결과={num_modifications}개")
-
+            logger.info(f"✅ 최종 수정 문장 수: {num_modifications}개")
             return num_modifications
 
         except Exception as e:

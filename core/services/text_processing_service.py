@@ -64,7 +64,7 @@ class TextProcessingService:
                     }
                 ))
                 
-                logger.info(f"[{request.request_id}] 1단계 완료 - 구문 통과: {original_evaluation.syntax_pass}")
+                logger.info(f"[{request.request_id}] 1단계 완료 - 구문 통과?: {original_evaluation.syntax_pass}")
                 
             except Exception as e:
                 step1_time = time.time() - step1_start_time
@@ -116,6 +116,10 @@ class TextProcessingService:
                 }
                 
                 # 문제 지표 자동 계산
+                logger.info(f"[{request.request_id}] 문제 지표 계산 시작")
+                logger.info(f"[{request.request_id}] 현재 지표: avg_sentence_length={original_metrics.AVG_SENTENCE_LENGTH:.3f}, embedded_clauses_ratio={original_metrics.All_Embedded_Clauses_Ratio:.3f}")
+                logger.info(f"[{request.request_id}] 마스터 지표: avg_sentence_length={request.master.AVG_SENTENCE_LENGTH:.3f}, embedded_clauses_ratio={request.master.All_Embedded_Clauses_Ratio:.3f}")
+                
                 problematic_metric = prompt_builder.determine_problematic_metric(
                     {
                         'avg_sentence_length': original_metrics.AVG_SENTENCE_LENGTH,
@@ -123,6 +127,8 @@ class TextProcessingService:
                     },
                     request.master, tolerance_abs, tolerance_ratio
                 )
+                
+                logger.info(f"[{request.request_id}] 문제 지표 결과: {problematic_metric}")
                 
                 if problematic_metric is None:
                     # 문제가 있는 지표가 없으면 구문 수정 불필요
@@ -152,7 +158,7 @@ class TextProcessingService:
                 
                 # 수정 문장 수 자동 계산
                 # 목표 범위 계산
-                if 'length' in problematic_metric.lower():
+                if problematic_metric == "avg_sentence_length":
                     target_min = request.master.AVG_SENTENCE_LENGTH - tolerance_abs.AVG_SENTENCE_LENGTH
                     target_max = request.master.AVG_SENTENCE_LENGTH + tolerance_abs.AVG_SENTENCE_LENGTH
                     current_value = original_metrics.AVG_SENTENCE_LENGTH
@@ -163,12 +169,15 @@ class TextProcessingService:
                     current_value = original_metrics.All_Embedded_Clauses_Ratio
                 
                 # 분석 결과에서 필요한 정보 추출 (metrics.py와 동일한 구조 사용)
-                basic_overview = original_analysis.get("table_01_basic_overview", {})
-                syntax_analysis = original_analysis.get("table_10_syntax_analysis", {})
-                table_02 = original_analysis.get("table_02_detailed_tokens", {})
-                table_09 = original_analysis.get("table_09_pos_distribution", {})
-                table_11 = original_analysis.get("table_11_lemma_metrics", {})
-                table_12 = original_analysis.get("table_12_unique_lemma_list", {})
+                data = original_analysis.get("data", {})
+                text_statistics = data.get("text_statistics", {})
+                
+                basic_overview = text_statistics.get("table_01_basic_overview", {})
+                syntax_analysis = text_statistics.get("table_10_syntax_analysis", {})
+                table_02 = text_statistics.get("table_02_detailed_tokens", {})
+                table_09 = text_statistics.get("table_09_pos_distribution", {})
+                table_11 = text_statistics.get("table_11_lemma_metrics", {})
+                table_12 = text_statistics.get("table_12_unique_lemma_list", {})
                 
                 sentence_count = basic_overview.get('sentence_count', 0)
                 avg_sentence_length = basic_overview.get('avg_sentence_length', 0.0)
@@ -184,20 +193,28 @@ class TextProcessingService:
                     'relative_clause_sentences': syntax_analysis.get('relative_clause_sentences', 0)
                 }
                 
-                # 어휘 수정용 분석 결과
-                lexical_analysis_result = {
-                    'content_lemmas': table_02.get('content_lemmas', 0),
-                    'propn_lemma_count': table_09.get('propn_lemma_count', 0),
-                    'cefr_a1_NVJD_lemma_count': table_11.get('cefr_a1_NVJD_lemma_count', 0),
-                    'cefr_a2_NVJD_lemma_count': table_11.get('cefr_a2_NVJD_lemma_count', 0)
-                }
+                # # 어휘 수정용 분석 결과
+                # lexical_analysis_result = {
+                #     'content_lemmas': table_02.get('content_lemmas', 0),
+                #     'propn_lemma_count': table_09.get('propn_lemma_count', 0),
+                #     'cefr_a1_NVJD_lemma_count': table_11.get('cefr_a1_NVJD_lemma_count', 0),
+                #     'cefr_a2_NVJD_lemma_count': table_11.get('cefr_a2_NVJD_lemma_count', 0)
+                # }
                 
-                # CEFR breakdown 추출 (table_12에서) - 객체 형태로
-                cefr_breakdown = table_12.get('cefr_breakdown', {})
+                # # CEFR breakdown 추출 (table_12에서) - 객체 형태로
+                # cefr_breakdown = table_12.get('cefr_breakdown', {})
+                
+                logger.info(f"[{request.request_id}] 수정 문장 수 계산 시작")
+                logger.info(f"[{request.request_id}] problematic_metric: {problematic_metric}")
+                logger.info(f"[{request.request_id}] current_value: {current_value:.3f}")
+                logger.info(f"[{request.request_id}] target_min: {target_min:.3f}, target_max: {target_max:.3f}")
+                logger.info(f"[{request.request_id}] analysis_result: {analysis_result}")
                 
                 num_modifications = prompt_builder.calculate_modification_count(
                     request.text, problematic_metric, current_value, target_min, target_max, analysis_result
                 )
+                
+                logger.info(f"[{request.request_id}] 계산된 수정 문장 수: {num_modifications}")
                 
                 # 새로운 수정된 fix_syntax 호출 (API에서 계산된 값 전달)
                 candidates, selected_text, final_metrics, final_evaluation, total_candidates_generated = await syntax_fixer.fix_syntax_with_params(
