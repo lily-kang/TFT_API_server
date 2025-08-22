@@ -80,6 +80,17 @@ class SyntaxFixer:
             total_candidates = len(self.temperatures) * self.candidates_per_temperature
             logger.info(f"LLM으로 총 {len(candidates)}개 후보 생성 완료 (예상: {total_candidates}개)")
             
+            # 생성된 후보들의 텍스트 내용 확인 (디버깅용)
+            for i, candidate in enumerate(candidates):
+                temp_index = i // self.candidates_per_temperature
+                candidate_index_in_temp = (i % self.candidates_per_temperature) + 1
+                temp_value = self.temperatures[temp_index] if temp_index < len(self.temperatures) else "Unknown"
+                logger.info(f"=== 후보 {i+1} (temp={temp_value}, {candidate_index_in_temp}/{self.candidates_per_temperature}) ===")
+                logger.info(f"길이: {len(candidate)}글자")
+                logger.info(f"처음 100글자: {candidate[:100]}...")
+                logger.info(f"마지막 100글자: ...{candidate[-100:]}")
+                logger.info("=" * 60)
+            
             # 각 후보를 분석기로 검증 (병렬 처리)
             logger.info(f"총 {len(candidates)}개 후보를 병렬로 분석 시작...")
             
@@ -203,7 +214,7 @@ class SyntaxFixer:
         except Exception as e:
             logger.error(f"구문 수정 실패: {str(e)}")
             raise LLMAPIError(f"구문 수정 중 오류 발생: {str(e)}")
-
+    
     async def fix_syntax(
         self,
         text: str,
@@ -250,7 +261,7 @@ class SyntaxFixer:
             if not problematic_metric:
                 logger.info("문제가 있는 지표가 없어 원본 텍스트 반환")
                 return [text], text
-
+            
             # 수정 문장 수는 API 요청에서 전달받으므로 고정값 3 사용
             num_modifications = 3
             

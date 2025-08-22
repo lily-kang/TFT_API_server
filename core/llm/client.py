@@ -104,6 +104,7 @@ class LLMClient:
         
         for temp in temperatures:
             for i in range(candidates_per_temp):
+                print(f"temp: {temp}")
                 task = self.generate_text(prompt, temperature=temp)
                 tasks.append(task)
                 task_info.append((temp, i + 1, candidates_per_temp))

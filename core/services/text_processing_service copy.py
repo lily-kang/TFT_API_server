@@ -7,6 +7,7 @@ from core.analyzer import analyzer
 from core.metrics import metrics_extractor
 from core.judge import judge
 from core.llm.syntax_fixer import syntax_fixer
+from core.llm.lexical_fixer import lexical_fixer
 from core.llm.prompt_builder import prompt_builder
 from utils.logging import logger
 
@@ -78,30 +79,123 @@ class TextProcessingService:
             
             # 구문 수정이 필요한지 확인
             if original_evaluation.syntax_pass == "PASS":
-                # 3단계: 어휘 수정 (스킵)
-                step_results.append(StepResult(
-                    step_name="어휘 수정",
-                    success=False,
-                    processing_time=0.0,
-                    error_message="구문이 이미 통과하여 어휘 수정 단계 스킵"
-                ))
+                logger.info(f"[{request.request_id}] 구문이 이미 통과")
                 
-                total_time = time.time() - total_start_time
-                logger.info(f"[{request.request_id}] 구문 수정 불필요 (이미 통과)")
+                # 어휘도 통과하면 완료
+                if original_evaluation.lexical_pass == "PASS":
+                    step_results.append(StepResult(
+                        step_name="어휘 수정",
+                        success=False,
+                        processing_time=0.0,
+                        error_message="구문과 어휘가 이미 통과하여 어휘 수정 단계 스킵"
+                    ))
+                    
+                    total_time = time.time() - total_start_time
+                    logger.info(f"[{request.request_id}] 구문과 어휘 모두 이미 통과 - 전체 완료")
+                    
+                    return SyntaxFixResponse(
+                        request_id=request.request_id,
+                        overall_success=True,
+                        original_text=request.text,
+                        final_text=request.text,  # 원본과 동일
+                        revision_success=True,
+                        step_results=step_results,
+                        original_metrics=original_metrics_dict,
+                        final_metrics=original_metrics_dict,
+                        candidates_generated=0,
+                        candidates_passed=1,
+                        total_processing_time=total_time
+                    )
                 
-                return SyntaxFixResponse(
-                    request_id=request.request_id,
-                    overall_success=True,
-                    original_text=request.text,
-                    final_text=request.text,  # 원본과 동일
-                    revision_success=True,
-                    step_results=step_results,
-                    original_metrics=original_metrics_dict,
-                    final_metrics=original_metrics_dict,
-                    candidates_generated=0,
-                    candidates_passed=1,
-                    total_processing_time=total_time
-                )
+                # 구문은 통과했지만 어휘는 실패 → 어휘 수정만 수행
+                logger.info(f"[{request.request_id}] 구문 통과, 어휘 실패 → 어휘 수정만 수행")
+                
+                step3_start_time = time.time()
+                try:
+                    # 어휘 수정용 현재 지표 (원본 텍스트 기반)
+                    current_metrics_for_lexical = {
+                        'cefr_nvjd_a1a2_lemma_ratio': original_metrics.CEFR_NVJD_A1A2_lemma_ratio
+                    }
+                    
+                    # target_level은 API에서 제공받아야 함 (현재는 임시로 설정)
+                    target_level = "3"  # 임시값
+                    
+                    # 어휘 수정 실행
+                    lexical_candidates, lexical_selected_text, lexical_final_metrics, lexical_final_evaluation, lexical_total_candidates = await lexical_fixer.fix_lexical_with_params(
+                        text=request.text,  # 원본 텍스트 사용
+                        master=request.master,
+                        tolerance_ratio=tolerance_ratio,
+                        current_metrics=current_metrics_for_lexical,
+                        target_level=target_level,
+                        cefr_breakdown=cefr_breakdown,
+                        lexical_analysis_result=lexical_analysis_result
+                    )
+                    
+                    # 최종 지표 업데이트
+                    final_metrics_dict = {
+                        'AVG_SENTENCE_LENGTH': lexical_final_metrics.AVG_SENTENCE_LENGTH,
+                        'All_Embedded_Clauses_Ratio': lexical_final_metrics.All_Embedded_Clauses_Ratio,
+                        'CEFR_NVJD_A1A2_lemma_ratio': lexical_final_metrics.CEFR_NVJD_A1A2_lemma_ratio
+                    }
+                    
+                    step3_time = time.time() - step3_start_time
+                    lexical_success = lexical_final_evaluation.lexical_pass == "PASS"
+                    
+                    step_results.append(StepResult(
+                        step_name="어휘 수정",
+                        success=lexical_success,
+                        processing_time=step3_time,
+                        details={
+                            "candidates_generated": lexical_total_candidates,
+                            "candidates_passed": len(lexical_candidates),
+                            "final_lexical_pass": lexical_final_evaluation.lexical_pass,
+                            "target_level": target_level
+                        }
+                    ))
+                    
+                    logger.info(f"[{request.request_id}] 어휘 수정 완료 - 성공: {lexical_success}")
+                    
+                    total_time = time.time() - total_start_time
+                    overall_success = lexical_success  # 어휘 수정 성공 여부
+                    
+                    return SyntaxFixResponse(
+                        request_id=request.request_id,
+                        overall_success=overall_success,
+                        original_text=request.text,
+                        final_text=lexical_selected_text,
+                        revision_success=overall_success,
+                        step_results=step_results,
+                        original_metrics=original_metrics_dict,
+                        final_metrics=final_metrics_dict,
+                        candidates_generated=lexical_total_candidates,
+                        candidates_passed=len(lexical_candidates),
+                        total_processing_time=total_time
+                    )
+                    
+                except Exception as e:
+                    step3_time = time.time() - step3_start_time
+                    step_results.append(StepResult(
+                        step_name="어휘 수정",
+                        success=False,
+                        processing_time=step3_time,
+                        error_message=str(e)
+                    ))
+                    
+                    total_time = time.time() - total_start_time
+                    return SyntaxFixResponse(
+                        request_id=request.request_id,
+                        overall_success=False,
+                        original_text=request.text,
+                        final_text=None,
+                        revision_success=False,
+                        step_results=step_results,
+                        original_metrics=original_metrics_dict,
+                        final_metrics=None,
+                        candidates_generated=0,
+                        candidates_passed=0,
+                        total_processing_time=total_time,
+                        error_message=f"어휘 수정 실패: {str(e)}"
+                    )
             
             # 2단계: 구문 수정 수행
             step2_start_time = time.time()
@@ -269,32 +363,133 @@ class TextProcessingService:
                     error_message=str(e)
                 )
             
-            # 3단계: 어휘 수정 (현재는 미구현)
-            step_results.append(StepResult(
-                step_name="어휘 수정",
-                success=False,
-                processing_time=0.0,
-                error_message="어휘 수정은 현재 구현되지 않음"
-            ))
+            # 구문 수정 후 어휘도 통과하면 완료
+            if final_evaluation.lexical_pass == "PASS":
+                step_results.append(StepResult(
+                    step_name="어휘 수정",
+                    success=False,
+                    processing_time=0.0,
+                    error_message="구문 수정 후 어휘가 이미 통과하여 어휘 수정 단계 스킵"
+                ))
+                
+                total_time = time.time() - total_start_time
+                overall_success = True  # 구문과 어휘 모두 통과
+                
+                logger.info(f"[{request.request_id}] 구문 수정 후 어휘도 통과 - 전체 완료")
+                
+                return SyntaxFixResponse(
+                    request_id=request.request_id,
+                    overall_success=overall_success,
+                    original_text=request.text,
+                    final_text=selected_text,
+                    revision_success=overall_success,
+                    step_results=step_results,
+                    original_metrics=original_metrics_dict,
+                    final_metrics=final_metrics_dict,
+                    candidates_generated=total_candidates_generated,
+                    candidates_passed=len(candidates),
+                    total_processing_time=total_time
+                )
             
-            total_time = time.time() - total_start_time
-            overall_success = final_evaluation.syntax_pass == "PASS"
+            # 3단계: 어휘 수정 (필요 시)
+            step3_start_time = time.time()
+            logger.info(f"[{request.request_id}] 3단계: 어휘 수정 시작")
             
-            logger.info(f"[{request.request_id}] 전체 완료 - 성공: {overall_success}, 총 시간: {total_time:.2f}초")
-            
-            return SyntaxFixResponse(
-                request_id=request.request_id,
-                overall_success=overall_success,
-                original_text=request.text,
-                final_text=selected_text,
-                revision_success=overall_success,
-                step_results=step_results,
-                original_metrics=original_metrics_dict,
-                final_metrics=final_metrics_dict,
-                candidates_generated=total_candidates_generated,
-                candidates_passed=len(candidates),
-                total_processing_time=total_time
-            )
+            try:
+                # 어휘 수정용 현재 지표 (구문 수정된 텍스트 기반)
+                current_metrics_for_lexical = {
+                    'cefr_nvjd_a1a2_lemma_ratio': final_metrics.CEFR_NVJD_A1A2_lemma_ratio
+                }
+                
+                # target_level은 API에서 제공받아야 함 (현재는 임시로 설정)
+                # TODO: API 요청에 target_level 추가 필요
+                target_level = "3"  # 임시값
+                
+                # 어휘 수정 실행
+                lexical_candidates, lexical_selected_text, lexical_final_metrics, lexical_final_evaluation, lexical_total_candidates = await lexical_fixer.fix_lexical_with_params(
+                    text=selected_text,  # 구문 수정된 텍스트 사용
+                    master=request.master,
+                    tolerance_ratio=tolerance_ratio,
+                    current_metrics=current_metrics_for_lexical,
+                    target_level=target_level,
+                    cefr_breakdown=cefr_breakdown,
+                    lexical_analysis_result=lexical_analysis_result
+                )
+                
+                # 최종 지표 업데이트
+                final_text = lexical_selected_text
+                final_metrics_dict = {
+                    'AVG_SENTENCE_LENGTH': lexical_final_metrics.AVG_SENTENCE_LENGTH,
+                    'All_Embedded_Clauses_Ratio': lexical_final_metrics.All_Embedded_Clauses_Ratio,
+                    'CEFR_NVJD_A1A2_lemma_ratio': lexical_final_metrics.CEFR_NVJD_A1A2_lemma_ratio
+                }
+                
+                step3_time = time.time() - step3_start_time
+                lexical_success = lexical_final_evaluation.lexical_pass == "PASS"
+                
+                step_results.append(StepResult(
+                    step_name="어휘 수정",
+                    success=lexical_success,
+                    processing_time=step3_time,
+                    details={
+                        "candidates_generated": lexical_total_candidates,
+                        "candidates_passed": len(lexical_candidates),
+                        "final_lexical_pass": lexical_final_evaluation.lexical_pass,
+                        "target_level": target_level
+                    }
+                ))
+                
+                logger.info(f"[{request.request_id}] 3단계 완료 - 성공: {lexical_success}, 후보: {len(lexical_candidates)}개")
+                
+                # 최종 성공 여부: 구문과 어휘 모두 통과해야 함
+                overall_success = (lexical_final_evaluation.syntax_pass == "PASS" and 
+                                 lexical_final_evaluation.lexical_pass == "PASS")
+                
+                total_time = time.time() - total_start_time
+                
+                return SyntaxFixResponse(
+                    request_id=request.request_id,
+                    overall_success=overall_success,
+                    original_text=request.text,
+                    final_text=final_text,
+                    revision_success=overall_success,
+                    step_results=step_results,
+                    original_metrics=original_metrics_dict,
+                    final_metrics=final_metrics_dict,
+                    candidates_generated=total_candidates_generated + lexical_total_candidates,
+                    candidates_passed=len(candidates) + len(lexical_candidates),
+                    total_processing_time=total_time
+                )
+                
+            except Exception as e:
+                step3_time = time.time() - step3_start_time
+                step_results.append(StepResult(
+                    step_name="어휘 수정",
+                    success=False,
+                    processing_time=step3_time,
+                    error_message=str(e)
+                ))
+                
+                # 어휘 수정 실패 시 구문 수정 결과만 반환
+                total_time = time.time() - total_start_time
+                overall_success = False  # 어휘 수정 실패
+                
+                logger.warning(f"[{request.request_id}] 어휘 수정 실패: {str(e)}")
+                
+                return SyntaxFixResponse(
+                    request_id=request.request_id,
+                    overall_success=overall_success,
+                    original_text=request.text,
+                    final_text=selected_text,  # 구문 수정까지만 반영
+                    revision_success=False,
+                    step_results=step_results,
+                    original_metrics=original_metrics_dict,
+                    final_metrics=final_metrics_dict,  # 구문 수정 결과
+                    candidates_generated=total_candidates_generated,
+                    candidates_passed=len(candidates),
+                    total_processing_time=total_time,
+                    error_message=f"어휘 수정 실패: {str(e)}"
+                )
             
         except Exception as e:
             total_time = time.time() - total_start_time

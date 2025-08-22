@@ -18,7 +18,7 @@ class LexicalFixer:
     def __init__(self):
         self.selector = CandidateSelector()
         self.temperatures = settings.llm_temperatures  # [0.2, 0.3]
-        self.candidates_per_temperature = settings.lexical_candidates_per_temperature or 2  # 기본값 2
+        self.candidates_per_temperature =  2  # 기본값 2
     
     async def fix_lexical_with_params(
         self,

@@ -92,7 +92,7 @@ class PromptBuilder:
             prompt_vars = {
                 'var_Generated_Passage': text,
                 'var_problematic_metric': problematic_metric,
-                'var_num_modifications': str(num_modifications),  # 고정값 3
+                'var_num_modifications': str(num_modifications),  
                 'var_current_value_avg_sentence_length': f"{current_metrics.get('avg_sentence_length', 0):.2f}",
                 'var_target_range_avg_sentence_length': target_range_length,
                 'var_current_value_embedded_clauses_ratio': f"{current_metrics.get('embedded_clauses_ratio', 0):.3f}",
@@ -119,8 +119,7 @@ class PromptBuilder:
         tolerance_ratio: ToleranceRatio,
         current_metrics: Dict[str, float],
         cefr_breakdown: Any = None,
-        target_level: str,
-        prompt_type: str,  # "INCREASE" or "DECREASE"
+        # prompt_type: str,  # "INCREASE" or "DECREASE"
         num_modifications: int = 3
     ) -> str:
         """
@@ -305,60 +304,61 @@ Do not include any explanation, JSON, or additional text. Just the number betwee
             # 분석 결과에서 필요한 값들 추출
             sentence_count = analysis_result.get('sentence_count', 0)
             lexical_tokens = analysis_result.get('lexical_tokens', 0)
-            
+
             # 복문 문장 수 총합 계산
             adverbial_clause_sentences = analysis_result.get('adverbial_clause_sentences', 0)
             coordinate_clause_sentences = analysis_result.get('coordinate_clause_sentences', 0)
             nominal_clause_sentences = analysis_result.get('nominal_clause_sentences', 0)
             relative_clause_sentences = analysis_result.get('relative_clause_sentences', 0)
-            
+
             total_clause_sentences = (
                 adverbial_clause_sentences + 
                 coordinate_clause_sentences + 
                 nominal_clause_sentences + 
                 relative_clause_sentences
             )
-            
+
+            # 평균 문장 길이 판단
             if 'length' in problematic_metric.lower():
-                # 평균 문장 길이 관련 계산
                 if current_value > target_max:
-                    # 1. 평균문장길이가 기준보다 클 때
+                    # 평균 문장 길이가 기준보다 큼 → 문장 수 늘려야 함
                     upper_bound = target_max
-                    num_modifications = max(1, round((lexical_tokens / upper_bound) - sentence_count + 0.5))
+                    num_modifications = math.ceil((lexical_tokens / upper_bound) - sentence_count)
                 else:
-                    # 2. 평균문장길이가 기준보다 작을 때
+                    # 평균 문장 길이가 기준보다 작음 → 문장 수 줄여야 함
                     lower_bound = target_min
-                    num_modifications = max(1, sentence_count - round(lexical_tokens / lower_bound))
-                    
+                    num_modifications = math.floor(sentence_count - (lexical_tokens / lower_bound))
+
+            # 복문 비율 판단
             elif 'clause' in problematic_metric.lower() or 'embedded' in problematic_metric.lower():
-                # 복문 비율 관련 계산
                 if current_value > target_max:
-                    # 3. 복문 비율이 기준보다 클 때
+                    # 복문 비율이 기준보다 큼 → 복문 줄여야 함
                     target_ratio_upper = target_max
-                    num_modifications = max(1, round(
+                    num_modifications = math.ceil(
                         (total_clause_sentences - (target_ratio_upper * sentence_count)) / 
-                        (1 + target_ratio_upper) + 0.5
-                    ))
+                        (1 + target_ratio_upper)
+                    )
                 else:
-                    # 4. 복문 비율이 기준보다 작을 때
+                    # 복문 비율이 기준보다 작음 → 복문 늘려야 함
                     target_ratio_lower = target_min
-                    num_modifications = max(1, round(
+                    num_modifications = math.ceil(
                         ((target_ratio_lower * sentence_count) - total_clause_sentences) / 
-                        (1 + target_ratio_lower) + 0.5
-                    ))
+                        (1 + target_ratio_lower)
+                    )
+
             else:
-                # 기본값
+                # 지정되지 않은 메트릭 → 기본값
                 num_modifications = 3
-            
+
             logger.info(f"수정 문장 수 계산: {problematic_metric}, 현재값={current_value:.3f}, "
-                       f"목표범위=[{target_min:.3f}, {target_max:.3f}], 계산결과={num_modifications}개")
-            
+                        f"목표범위=[{target_min:.3f}, {target_max:.3f}], 계산결과={num_modifications}개")
+
             return num_modifications
-            
+
         except Exception as e:
             logger.error(f"수정 문장 수 계산 실패: {str(e)}")
             return 3  # 기본값 반환
-
+    
     def calculate_lexical_modification_count(
         self,
         current_ratio: float,
