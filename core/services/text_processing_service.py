@@ -78,12 +78,13 @@ class TextProcessingService:
             
             # 구문 수정이 필요한지 확인
             if original_evaluation.syntax_pass == "PASS":
-                # 3단계: 어휘 수정 (스킵)
+                # 구문 패스하면 일단 어휘 수정
+                # 3단계: 어휘 수정 
                 step_results.append(StepResult(
-                    step_name="어휘 수정",
+                    step_name="어휘 수정(지금은 안함)",
                     success=False,
                     processing_time=0.0,
-                    error_message="구문이 이미 통과하여 어휘 수정 단계 스킵"
+                    error_message="구문이 이미 통과하여 어휘 수정 단계로"
                 ))
                 
                 total_time = time.time() - total_start_time
@@ -103,7 +104,7 @@ class TextProcessingService:
                     total_processing_time=total_time
                 )
             
-            # 2단계: 구문 수정 수행
+            # 2단계: 실패시 구문 수정 수행
             step2_start_time = time.time()
             logger.info(f"[{request.request_id}] 2단계: 구문 수정 시작")
             
@@ -130,31 +131,31 @@ class TextProcessingService:
                 
                 logger.info(f"[{request.request_id}] 문제 지표 결과: {problematic_metric}")
                 
-                if problematic_metric is None:
-                    # 문제가 있는 지표가 없으면 구문 수정 불필요
-                    step_results.append(StepResult(
-                        step_name="어휘 수정",
-                        success=False,
-                        processing_time=0.0,
-                        error_message="구문이 이미 통과하여 어휘 수정 단계 스킵"
-                    ))
+                # if problematic_metric is None:
+                #     # 문제가 있는 지표가 없으면 구문 수정 불필요
+                #     step_results.append(StepResult(
+                #         step_name="어휘 수정",
+                #         success=False,
+                #         processing_time=0.0,
+                #         error_message="구문이 이미 통과하여 어휘 수정 단계 스킵"
+                #     ))
                     
-                    total_time = time.time() - total_start_time
-                    logger.info(f"[{request.request_id}] 구문 수정 불필요 (이미 통과)")
+                #     total_time = time.time() - total_start_time
+                #     logger.info(f"[{request.request_id}] 구문 수정 불필요 (이미 통과)")
                     
-                    return SyntaxFixResponse(
-                        request_id=request.request_id,
-                        overall_success=True,
-                        original_text=request.text,
-                        final_text=request.text,  # 원본과 동일
-                        revision_success=True,
-                        step_results=step_results,
-                        original_metrics=original_metrics_dict,
-                        final_metrics=original_metrics_dict,
-                        candidates_generated=0,
-                        candidates_passed=1,
-                        total_processing_time=total_time
-                    )
+                #     return SyntaxFixResponse(
+                #         request_id=request.request_id,
+                #         overall_success=True,
+                #         original_text=request.text,
+                #         final_text=request.text,  # 원본과 동일
+                #         revision_success=True,
+                #         step_results=step_results,
+                #         original_metrics=original_metrics_dict,
+                #         final_metrics=original_metrics_dict,
+                #         candidates_generated=0,
+                #         candidates_passed=1,
+                #         total_processing_time=total_time
+                #     )
                 
                 # 수정 문장 수 자동 계산
                 # 목표 범위 계산
@@ -216,7 +217,7 @@ class TextProcessingService:
                 
                 logger.info(f"[{request.request_id}] 계산된 수정 문장 수: {num_modifications}")
                 
-                # 새로운 수정된 fix_syntax 호출 (API에서 계산된 값 전달)
+                # fix_syntax_with_params 호출 (계산된 값 전달)
                 candidates, selected_text, final_metrics, final_evaluation, total_candidates_generated = await syntax_fixer.fix_syntax_with_params(
                     text=request.text,
                     master=request.master,
@@ -262,12 +263,12 @@ class TextProcessingService:
                     error_message=str(e)
                 ))
                 
-                # 3단계: 어휘 수정 (실패로 스킵)
+                # 3단계: 어휘 수정 (지금은 스킵)
                 step_results.append(StepResult(
                     step_name="어휘 수정",
                     success=False,
                     processing_time=0.0,
-                    error_message="구문 수정 실패로 어휘 수정 단계 스킵"
+                    error_message="어휘 수정 단계 스킵"
                 ))
                 
                 total_time = time.time() - total_start_time

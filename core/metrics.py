@@ -95,17 +95,17 @@ class MetricsExtractor:
             
             # 최종 결과
             extracted = MetricsData(
-                AVG_SENTENCE_LENGTH=float(avg_sentence_length),
-                All_Embedded_Clauses_Ratio=float(all_embedded_clauses_ratio),
-                CEFR_NVJD_A1A2_lemma_ratio=float(cefr_a1a2_ratio)
+                AVG_SENTENCE_LENGTH=round(float(avg_sentence_length), 3),
+                All_Embedded_Clauses_Ratio=round(float(all_embedded_clauses_ratio), 3),
+                CEFR_NVJD_A1A2_lemma_ratio=round(float(cefr_a1a2_ratio), 3)
             )
             
             logger.info("\n" + "="*60)
             logger.info("🎯 최종 추출된 지표")
             logger.info("="*60)
-            logger.info(f"✅ AVG_SENTENCE_LENGTH: {extracted.AVG_SENTENCE_LENGTH}")
-            logger.info(f"✅ All_Embedded_Clauses_Ratio: {extracted.All_Embedded_Clauses_Ratio}")
-            logger.info(f"✅ CEFR_NVJD_A1A2_lemma_ratio: {extracted.CEFR_NVJD_A1A2_lemma_ratio}")
+            logger.info(f"✅ AVG_SENTENCE_LENGTH: {extracted.AVG_SENTENCE_LENGTH:.3f}")
+            logger.info(f"✅ All_Embedded_Clauses_Ratio: {extracted.All_Embedded_Clauses_Ratio:.3f}")
+            logger.info(f"✅ CEFR_NVJD_A1A2_lemma_ratio: {extracted.CEFR_NVJD_A1A2_lemma_ratio:.3f}")
             logger.info("="*60)
             
             return extracted

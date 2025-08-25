@@ -213,7 +213,7 @@ class SyntaxFixer:
             
         except Exception as e:
             logger.error(f"구문 수정 실패: {str(e)}")
-            raise LLMAPIError(f"구문 수정 중 오류 발생: {str(e)}")
+            raise LLMAPIError(f"구문 수정 실패: {str(e)}")
     
     async def fix_syntax(
         self,
