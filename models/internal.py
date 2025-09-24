@@ -8,6 +8,7 @@ class AnalyzerRequest(BaseModel):
     text: str
     auto_sentence_split: bool = True
     include_syntax_analysis: bool = True
+    llm_model: str = "gpt-4.1"
 
 
 class MetricsData(BaseModel):

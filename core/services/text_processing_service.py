@@ -211,9 +211,12 @@ class TextProcessingService:
                 logger.info(f"[{request.request_id}] target_min: {target_min:.3f}, target_max: {target_max:.3f}")
                 logger.info(f"[{request.request_id}] analysis_result: {analysis_result}")
                 
-                num_modifications = prompt_builder.calculate_modification_count(
-                    request.text, problematic_metric, current_value, target_min, target_max, analysis_result
+                modification_params = prompt_builder.calculate_modification_count(
+                    problematic_metric, current_value, target_min, target_max, analysis_result
                 )
+                
+                num_modifications = modification_params['num_modifications']
+                # 기존 서비스는 prompt_type을 사용하지 않으므로 무시
                 
                 logger.info(f"[{request.request_id}] 계산된 수정 문장 수: {num_modifications}")
                 
@@ -227,6 +230,7 @@ class TextProcessingService:
                     num_modifications=num_modifications,
                     problematic_metric=problematic_metric,
                     referential_clauses=referential_clauses
+                    # prompt_type은 기본값 "increase" 사용
                 )
                 
                 # 최종 지표 딕셔너리 변환

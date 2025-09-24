@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     
     # OpenAI API 설정
     openai_api_key: str = os.getenv("OPENAI_API_KEY")
-    openai_model: str = "gpt-4o"
+    openai_model: str = "gpt-4.1"
     
     # 앱 설정
     debug: bool = True

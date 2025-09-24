@@ -15,13 +15,13 @@ app = FastAPI(
 
 # 라우터 등록
 app.include_router(pipeline_router)
-app.include_router(analyzer_router)
+# app.include_router(analyzer_router)
 
 
 @app.get("/", include_in_schema=False)
 async def read_root():
     return {
-        "message": "Text Processing Pipeline API가 실행 중입니다.",
+        "message": "Text Revision Pipeline API가 실행 중입니다.",
         "docs": "/docs",
         "status": "running"
     }

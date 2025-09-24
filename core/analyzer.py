@@ -14,7 +14,7 @@ class TextAnalyzer:
         self.api_url = settings.external_analyzer_api_url
         self.timeout = settings.pipeline_timeout
     
-    async def analyze(self, text: str, include_syntax: bool = True) -> Dict[str, Any]:
+    async def analyze(self, text: str, include_syntax: bool = True, llm_model: str = "gpt-4.1") -> Dict[str, Any]:
         """
         텍스트를 외부 분석기 API로 전송하여 분석 결과를 받아옵니다.
         

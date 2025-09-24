@@ -225,8 +225,8 @@ async def fix_syntax(request: SyntaxFixRequest):
             }
             
             num_modifications = prompt_builder.calculate_modification_count(
-                request.text, problematic_metric, current_value, target_min, target_max, analysis_result
-            )
+                problematic_metric, current_value, target_min, target_max, analysis_result
+            )['num_modifications']
             
             step1_time = time.time() - step1_start_time
             step_results.append(StepResult(

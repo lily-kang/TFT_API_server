@@ -12,7 +12,9 @@ class LLMClient:
     def __init__(self):
         self.model = settings.openai_model
         self._client = None
-    
+        self.temperatures = settings.llm_temperatures
+        self.candidates_per_temperature = settings.syntax_candidates_per_temperature
+        
     @property
     def client(self):
         """Lazy initialization으로 OpenAI 클라이언트 생성"""
@@ -198,6 +200,59 @@ class LLMClient:
         except Exception as e:
             logger.warning(f"선택 번호 추출 실패: {str(e)}")
             return 1  # 기본값
+
+    async def generate_messages(self, messages: List[dict], temperature: float = 0.7, max_tokens: Optional[int] = None) -> str:
+        """
+        메시지(roles 포함)를 사용하는 생성 메서드
+        """
+        try:
+            if not self.client:
+                raise LLMAPIError("OpenAI 클라이언트가 초기화되지 않았습니다")
+
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+            generated_text = response.choices[0].message.content.strip()
+            logger.info(f"메시지 기반 텍스트 생성 성공 (temp={temperature}): {len(generated_text)} 글자")
+            return generated_text
+        except Exception as e:
+            logger.error(f"메시지 기반 텍스트 생성 실패 (temp={temperature}): {str(e)}")
+            raise LLMAPIError(f"텍스트 생성 실패: {str(e)}")
+
+    async def generate_multiple_messages_per_temperature(
+        self,
+        messages: List[dict],
+    ) -> List[str]:
+        """
+        각 temperature별로 여러 개의 후보를 메시지 기반으로 생성 (병렬)
+        """
+        tasks = []
+        task_info = []
+        for temp in self.temperatures:
+            for i in range(self.candidates_per_temperature):
+                task = self.generate_messages(messages, temperature=temp)
+                tasks.append(task)
+                task_info.append((temp, i + 1, self.candidates_per_temperature))
+        total_tasks = len(tasks)
+        logger.info(f"총 {total_tasks}개 후보(메시지 기반)를 병렬로 생성 시작...")
+        try:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            final_results = []
+            for i, (result, (temp, candidate_num, total_per_temp)) in enumerate(zip(results, task_info)):
+                if isinstance(result, Exception):
+                    logger.warning(f"  후보 생성 실패 (temp={temp}, {candidate_num}/{total_per_temp}): {str(result)}")
+                    final_results.append(f"[생성 실패: {str(result)}]")
+                else:
+                    logger.info(f"  후보 {i+1}: 생성 완료 (temp={temp}, {candidate_num}/{total_per_temp})")
+                    final_results.append(result)
+            logger.info(f"후보 생성 완료(메시지 기반): 총 {len(final_results)}개 후보")
+            return final_results
+        except Exception as e:
+            logger.error(f"후보 생성 중 예기치 못한 오류: {str(e)}")
+            return []
 
 
 # 전역 LLM 클라이언트 인스턴스
