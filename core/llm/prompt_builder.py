@@ -4,9 +4,8 @@ import math
 import json
 from typing import Dict, Any, Optional, List
 from models.request import MasterMetrics, ToleranceAbs, ToleranceRatio
-from config.prompts import SYNTAX_USER_INPUT_TEMPLATE, SYNTAX_PROMPT_DECREASE, SYNTAX_PROMPT_INCREASE, LEXICAL_FIXING_PROMPT_DECREASE, LEXICAL_FIXING_PROMPT_INCREASE, CANDIDATE_SELECTION_PROMPT
+from config.revision_prompts import SYNTAX_USER_INPUT_TEMPLATE, SYNTAX_PROMPT_DECREASE, SYNTAX_PROMPT_INCREASE, Lexical_USER_INPUT_TEMPLATE, LEXICAL_FIXING_PROMPT_DECREASE, LEXICAL_FIXING_PROMPT_INCREASE, CANDIDATE_SELECTION_PROMPT
 from utils.logging import logger
-from config.prompts import Lexical_USER_INPUT_TEMPLATE, LEXICAL_FIXING_PROMPT_INCREASE, LEXICAL_FIXING_PROMPT_DECREASE
 
 class PromptBuilder:
     """LLM 프롬프트 구성 클래스"""
@@ -154,7 +153,7 @@ class PromptBuilder:
             user_prompt = SYNTAX_USER_INPUT_TEMPLATE
             for var_name, var_value in user_vars.items():
                 user_prompt = user_prompt.replace(f"{{{var_name}}}", str(var_value))
-
+            
             return [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -162,7 +161,7 @@ class PromptBuilder:
         except Exception as e:
             logger.error(f"구문 프롬프트 생성 실패: {str(e)}")
             raise
-
+    
     # def build_lexical_prompt(
     #     self,
     #     text: str,
@@ -561,8 +560,8 @@ Do not include any explanation, JSON, or additional text. Just the number betwee
                 lines.append(f"## {key.upper()} Lemmas (count={lemma_count})")
                 if lemma_list:
                     lines.extend([f"- {lemma}" for lemma in lemma_list])
-                else:
-                    lines.append("- (none)")
+            else:
+                lines.append("- (none)")
                 lines.append("")
             return "\n".join(lines).strip()
         except Exception as e:

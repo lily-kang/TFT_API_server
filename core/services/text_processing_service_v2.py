@@ -304,7 +304,7 @@ class TextProcessingService:
                 total_processing_time=total_time,
                 error_message=error_msg
             )
-
+    
     async def fix_revise_single(self, request: SyntaxFixRequest) -> SyntaxFixResponse:
         """
         결합 리비전: 구문 수정 → 구문 결과 분석 → 어휘 통과 여부 확인 → 필요 시 어휘 단계로 분기

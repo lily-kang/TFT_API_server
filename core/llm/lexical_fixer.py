@@ -8,7 +8,7 @@ from core.analyzer import analyzer
 from core.metrics import metrics_extractor
 from core.judge import judge
 from config.settings import settings
-from config.prompts import Lexical_USER_INPUT_TEMPLATE, LEXICAL_FIXING_PROMPT_INCREASE, LEXICAL_FIXING_PROMPT_DECREASE
+from config.revision_prompts import Lexical_USER_INPUT_TEMPLATE, LEXICAL_FIXING_PROMPT_INCREASE, LEXICAL_FIXING_PROMPT_DECREASE
 from models.request import MasterMetrics, ToleranceRatio
 from models.internal import LLMCandidate, LLMResponse
 from utils.exceptions import LLMAPIError
@@ -39,7 +39,7 @@ class LexicalFixer:
         Args:
             text: 수정할 텍스트
             master: 마스터 지표
-            tolerance_ratio: 비율 허용 오차  
+            tolerance_ratio: 비율 허용 오차
             current_cefr_ratio: 현재 CEFR A1A2 비율
             direction: "increase" (쉽게) 또는 "decrease" (어렵게)
             
@@ -72,7 +72,7 @@ class LexicalFixer:
 
             # 프롬프트 방향 자동 결정 (현재 비율 기준)
             # 방향은 외부 계산(calc['direction']) 결과를 사용 (재계산하지 않음)
-
+            
             # 프롬프트 구성 (prompt_builder 사용)
             prompt = prompt_builder.build_lexical_prompt(
                 text=text,
@@ -284,7 +284,7 @@ class LexicalFixer:
                 logger.debug(f"어휘 후보 {i+1} 생성 완료")
             except Exception as e:
                 logger.warning(f"어휘 후보 {i+1} 생성 실패: {str(e)}")
-        
+    
         return candidates
 
 

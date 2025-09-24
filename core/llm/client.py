@@ -51,7 +51,7 @@ class LLMClient:
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=temperature,
-                max_tokens=max_tokens
+                max_tokens=max_tokens or settings.llm_max_output_tokens
             )
             
             generated_text = response.choices[0].message.content.strip()
@@ -213,7 +213,7 @@ class LLMClient:
                 model=self.model,
                 messages=messages,
                 temperature=temperature,
-                max_tokens=max_tokens
+                max_tokens=max_tokens or settings.llm_max_output_tokens
             )
             generated_text = response.choices[0].message.content.strip()
             logger.info(f"메시지 기반 텍스트 생성 성공 (temp={temperature}): {len(generated_text)} 글자")
