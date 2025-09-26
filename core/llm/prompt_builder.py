@@ -4,7 +4,8 @@ import math
 import json
 from typing import Dict, Any, Optional, List
 from models.request import MasterMetrics, ToleranceAbs, ToleranceRatio
-from config.revision_prompts import SYNTAX_USER_INPUT_TEMPLATE, SYNTAX_PROMPT_DECREASE, SYNTAX_PROMPT_INCREASE, Lexical_USER_INPUT_TEMPLATE, LEXICAL_FIXING_PROMPT_DECREASE, LEXICAL_FIXING_PROMPT_INCREASE, CANDIDATE_SELECTION_PROMPT
+from config.syntax_revision_prompt import SYNTAX_USER_INPUT_TEMPLATE, SYNTAX_PROMPT_DECREASE, SYNTAX_PROMPT_INCREASE, CANDIDATE_SELECTION_PROMPT
+from config.lexical_revision_prompt import Lexical_USER_INPUT_TEMPLATE, LEXICAL_FIXING_PROMPT_DECREASE, LEXICAL_FIXING_PROMPT_INCREASE
 from utils.logging import logger
 
 class PromptBuilder:

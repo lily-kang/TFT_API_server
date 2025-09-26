@@ -8,7 +8,7 @@ from core.analyzer import analyzer
 from core.metrics import metrics_extractor
 from core.judge import judge
 from config.settings import settings
-from config.revision_prompts import Lexical_USER_INPUT_TEMPLATE, LEXICAL_FIXING_PROMPT_INCREASE, LEXICAL_FIXING_PROMPT_DECREASE
+from config.lexical_revision_prompt import Lexical_USER_INPUT_TEMPLATE, LEXICAL_FIXING_PROMPT_INCREASE, LEXICAL_FIXING_PROMPT_DECREASE
 from models.request import MasterMetrics, ToleranceRatio
 from models.internal import LLMCandidate, LLMResponse
 from utils.exceptions import LLMAPIError

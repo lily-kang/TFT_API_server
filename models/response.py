@@ -73,6 +73,7 @@ class BatchPipelineResponse(BaseModel):
 class StepResult(BaseModel):
     """단계별 처리 결과 모델"""
     step_name: str = Field(description="단계명")
+    status: str = Field(description="단계 상태")
     success: bool = Field(description="성공 여부")
     processing_time: float = Field(description="처리 시간 (초)")
     details: Optional[Dict[str, Any]] = Field(default=None, description="상세 정보")

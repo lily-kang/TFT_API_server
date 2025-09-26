@@ -10,7 +10,8 @@ from core.llm.syntax_fixer import syntax_fixer
 from core.llm.lexical_fixer import lexical_fixer
 from core.llm.prompt_builder import prompt_builder
 from utils.logging import logger
-
+import nltk
+nltk.download('punkt')
 
 class TextProcessingService:
     """텍스트 처리 서비스 (구문/어휘 수정)"""
@@ -59,6 +60,7 @@ class TextProcessingService:
                 step1_time = time.time() - step1_start_time
                 step_results.append(StepResult(
                     step_name="원본 지문 분석",
+                    status=f"[revise] 원본 분석 완료 - 구문: {original_evaluation.syntax_pass}, 어휘: {original_evaluation.lexical_pass}",
                     success=True,
                     processing_time=step1_time,
                     details={
@@ -74,6 +76,7 @@ class TextProcessingService:
                 step1_time = time.time() - step1_start_time
                 step_results.append(StepResult(
                     step_name="원본 지문 분석",
+                    status=f"[revise] 원본 분석 실패 - {str(e)}",
                     success=False,
                     processing_time=step1_time,
                     error_message=str(e)
@@ -236,6 +239,7 @@ class TextProcessingService:
                 step2_time = time.time() - step2_start_time
                 step_results.append(StepResult(
                     step_name="구문 수정",
+                    status=f"[revise] 구문 수정 실패 - {str(e)}",
                     success=False,
                     processing_time=step2_time,
                     error_message=str(e)
@@ -335,6 +339,7 @@ class TextProcessingService:
                 step_results.append(StepResult(
                     step_name="원본 지문 분석",
                     success=True,
+                    status=f"[revise] 원본 분석 완료 - 구문: {original_evaluation.syntax_pass}, 어휘: {original_evaluation.lexical_pass}",
                     processing_time=time.time() - t1,
                     details={
                         "syntax_pass": original_evaluation.syntax_pass,
@@ -347,6 +352,7 @@ class TextProcessingService:
             except Exception as e:
                 step_results.append(StepResult(
                     step_name="원본 지문 분석",
+                    status=f"[revise] 원본 분석 실패 - {str(e)}",
                     success=False,
                     processing_time=time.time() - t1,
                     error_message=str(e)
@@ -381,6 +387,7 @@ class TextProcessingService:
                 # 어휘 수정 단계로 직접 이동 (구문 수정 단계 스킵)
                 step_results.append(StepResult(
                     step_name="구문 수정",
+                    status=f"[revise] syntax PASS & vocab FAIL → 어휘 수정 모듈",
                     success=True,
                     processing_time=0.0,
                     details={
@@ -390,6 +397,7 @@ class TextProcessingService:
                         "candidates_passed": 0
                     }
                 ))
+                
                 
                 # 바로 어휘 수정 단계로 분기
                 selected_candidate_lexical_pass = "FAIL"  # 원본이 어휘 실패했으므로
@@ -466,6 +474,7 @@ class TextProcessingService:
 
                     step_results.append(StepResult(
                         step_name="구문 수정",
+                        status=f"[revise] syntax revision success & vocab PASS",
                         success=True,
                         processing_time=time.time() - t2,
                         details={
@@ -480,10 +489,27 @@ class TextProcessingService:
                             }
                         }
                     ))
+                    
+                    # 어휘 수정 단계 기록 (어휘 PASS로 별도 수정 불필요)
+                    step_results.append(StepResult(
+                        step_name="어휘 수정",
+                        status="[revise] lexical check PASS (no lexical fixing needed)",
+                        success=True,
+                        processing_time=0.0,
+                        details={
+                            "skipped": True,
+                            "reason": "구문 수정된 지문이 어휘 지표도 통과하여 어휘 수정 불필요",
+                            "lexical_pass": selected_candidate_lexical_pass,
+                            "cefr_a1a2_ratio": lex_current,
+                            "target_min": lex_target_min,
+                            "target_max": lex_target_max
+                        }
+                    ))
 
                 except Exception as e:
                     step_results.append(StepResult(
                         step_name="구문 수정",
+                        status=f"[revise] syntax revision FAIL - {str(e)}",
                         success=False,
                         processing_time=time.time() - t2,
                         error_message=str(e)
@@ -541,7 +567,7 @@ class TextProcessingService:
                 )
 
             # 7) 어휘 수정 단계 (lexical_fixer 연동)
-            t4 = time.time()
+            t3=time.time()
             try:
                 # 분기별 텍스트 및 지표 소스 결정
                 if original_evaluation.syntax_pass == "PASS":
@@ -570,9 +596,10 @@ class TextProcessingService:
                 lex_num_mods = int(lex_calc.get('num_modifications', 0))
                 lex_direction = lex_calc.get('direction', 'increase')
 
-                # 어휘 후보 생성 (0인 경우도 프롬프트 최소 1개 수행할지 정책에 따라 조정 가능)
+                # 어휘 후보 생성 및 취합 (0인 경우도 프롬프트 최소 1개 수행할지 정책에 따라 조정 가능)
+                normalized_text_for_lex = " ".join(text_for_lex.split())
                 lex_mods, lex_selected_text, lex_metrics, _lex_eval, lex_candidates_generated = await lexical_fixer.fix_lexical_with_params(
-                    text=text_for_lex,
+                    text=normalized_text_for_lex,
                     master=request.master,
                     tolerance_ratio=tolerance_ratio,
                     current_cefr_ratio=current_ratio,
@@ -584,8 +611,9 @@ class TextProcessingService:
 
                 step_results.append(StepResult(
                     step_name="어휘 수정",
+                    status=f"[revise] vocab revision success",
                     success=True,
-                    processing_time=time.time() - t4,
+                    processing_time=time.time() - t3,
                     details={
                         "current_ratio": current_ratio,
                         "nvjd_total_lemma_count": nvjd_total,
@@ -601,23 +629,24 @@ class TextProcessingService:
                 total_time = time.time() - total_start_time
                 return SyntaxFixResponse(
                     request_id=request.request_id,
-                    overall_success=False,
+                    overall_success=True,
                     original_text=request.text,
                     final_text=selected_text,
-                    revision_success=False,
+                    revision_success=True,
                     step_results=step_results,
                     original_metrics=original_metrics_dict,
                     final_metrics=final_metrics_dict,
                     candidates_generated=candidates_generated,
                     candidates_passed=candidates_passed,
                     total_processing_time=total_time,
-                    error_message="어휘 수정 후보가 제공되었습니다. (최종 적용은 별도 단계)"
+                    error_message="어휘 수정 제안 제공 완료"
                 )
             except Exception as e:
                 step_results.append(StepResult(
                     step_name="어휘 수정",
+                    status=f"[revise] vocab revision FAIL - {str(e)}",
                     success=False,
-                    processing_time=time.time() - t4,
+                    processing_time=time.time() - t3,
                     error_message=str(e)
                 ))
 
