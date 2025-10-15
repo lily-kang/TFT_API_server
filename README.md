@@ -1,6 +1,7 @@
 # Text Processing Pipeline API
 
-텍스트 품질 검수 파이프라인 API - 구문/어휘 수정 자동화 시스템
+1. 텍스트 품질 검수 파이프라인 API - 구문/어휘 수정 자동화 시스템
+
 
 ## 개요
 
@@ -215,3 +216,5 @@ api_server/
 **엔드포인트**: `GET /health`
 
 서비스 상태와 설정 정보를 확인할 수 있습니다. 
+
+2. Topic Closeness Label

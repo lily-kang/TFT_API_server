@@ -363,6 +363,31 @@ class TextProcessingService:
             if original_evaluation.syntax_pass == "PASS" and original_evaluation.lexical_pass == "PASS":
                 total_time = time.time() - total_start_time
                 logger.info(f"[revise] 구문 & 어휘 모두 통과 → 즉시 종료")
+                step_results.append(StepResult(
+                    step_name="구문 수정",
+                    status=f"[revise] 구문 & 어휘 모두 통과",
+                    success=True,
+                    processing_time=0.0,
+                    details={
+                        "skipped": True,
+                        "reason": "구문 통과로 스킵",
+                        "candidates_generated": 0,
+                        "candidates_passed": 0
+                    }
+                ))
+                step_results.append(StepResult(
+                    step_name="어휘 수정",
+                    status=f"[revise] 구문 & 어휘 모두 통과",
+                    success=True,
+                    processing_time=0.0,
+                    details={
+                        "skipped": True,
+                        "reason": "구문 통과로 스킵",
+                        "candidates_generated": 0,
+                        "candidates_passed": 0
+                    }
+                ))
+                
                 return SyntaxFixResponse(
                     request_id=request.request_id,
                     overall_success=True,
@@ -639,7 +664,7 @@ class TextProcessingService:
                     candidates_generated=candidates_generated,
                     candidates_passed=candidates_passed,
                     total_processing_time=total_time,
-                    error_message="어휘 수정 제안 제공 완료"
+                    error_message=str(e)
                 )
             except Exception as e:
                 step_results.append(StepResult(
@@ -653,7 +678,7 @@ class TextProcessingService:
                 total_time = time.time() - total_start_time
                 return SyntaxFixResponse(
                     request_id=request.request_id,
-                    overall_success=False,
+                    overall_success=True,
                     original_text=request.text,
                     final_text=selected_text,
                     revision_success=False,

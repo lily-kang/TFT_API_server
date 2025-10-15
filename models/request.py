@@ -33,39 +33,6 @@ class PipelineItem(BaseModel):
     syntax_candidates: int = Field(default=3, description="구문 수정 후보 개수")
     lexical_candidates: int = Field(default=3, description="어휘 수정 후보 개수")
 
-
-class BatchPipelineRequest(BaseModel):
-    """배치 파이프라인 요청 모델"""
-    items: List[PipelineItem] = Field(description="처리할 항목 리스트")
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "items": [
-                    {
-                        "client_id": "row_12",
-                        "original_text": "원문 A",
-                        "title": "Story A",
-                        "generated_passage": "검수대상 A",
-                        "include_syntax": True,
-                        "master": {
-                            "AVG_SENTENCE_LENGTH": 12.3,
-                            "All_Embedded_Clauses_Ratio": 0.18,
-                            "CEFR_NVJD_A1A2_lemma_ratio": 0.46
-                        },
-                        "tolerance_abs": {"AVG_SENTENCE_LENGTH": 1.97},
-                        "tolerance_ratio": {
-                            "All_Embedded_Clauses_Ratio": 0.202,
-                            "CEFR_NVJD_A1A2_lemma_ratio": 0.104
-                        },
-                        "syntax_candidates": 3,
-                        "lexical_candidates": 3
-                    }
-                ]
-            }
-        } 
-
-
 class SyntaxFixRequest(BaseModel):
     """구문 수정 요청 모델 (단순화된 버전)"""
     request_id: str = Field(description="요청 ID (앱스크립트에서 관리)")
