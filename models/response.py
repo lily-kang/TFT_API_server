@@ -46,33 +46,10 @@ class PipelineResult(BaseModel):
     trace: Optional[List[TraceStep]] = Field(default=None, description="처리 과정 추적")
     error_message: Optional[str] = Field(default=None, description="에러 메시지")
 
-
-class BatchPipelineResponse(BaseModel):
-    """배치 파이프라인 응답 모델"""
-    results: List[PipelineResult] = Field(description="처리 결과 리스트")
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "results": [
-                    {
-                        "client_id": "row_12",
-                        "status": "final",
-                        "syntax_pass": "PASS",
-                        "lexical_pass": "PASS",
-                        "detailed_result": "AVG_SENTENCE_LENGTH: 10.470 vs [6.620 ~ 11.080] → Pass\nCEFR_NVJD_A1A2_lemma_ratio: 0.571 vs [0.515 ~ 0.651] → Pass",
-                        "final_text": "최종 텍스트 A",
-                        "attempts": {"syntax": 1, "lexical": 1},
-                        "trace": []
-                    }
-                ]
-            }
-        } 
-
-
 class StepResult(BaseModel):
     """단계별 처리 결과 모델"""
     step_name: str = Field(description="단계명")
+    status: str = Field(description="단계 상태")
     success: bool = Field(description="성공 여부")
     processing_time: float = Field(description="처리 시간 (초)")
     details: Optional[Dict[str, Any]] = Field(default=None, description="상세 정보")

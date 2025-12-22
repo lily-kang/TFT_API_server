@@ -1,15 +1,177 @@
 import time
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field, ConfigDict, AliasChoices
+from typing import List, Optional, Dict, Any, Union
 from core.services.text_processing_service_v2 import text_processing_service
-from models.request import SyntaxFixRequest, BatchSyntaxFixRequest
+from models.request import SyntaxFixRequest, BatchSyntaxFixRequest, semanticProfileRequest, BatchSemProfileRequest
 from models.response import SyntaxFixResponse, BatchSyntaxFixResponse
 from models.internal import AnalyzerRequest
 from core.analyzer import analyzer
 from utils.logging import logger
+from core.services.semantic_profile import (
+	generate_semantic_profile_for_passage,
+	generate_semantic_profiles_batch,
+)
+from core.services.topic_closeness import score_topic_closeness, generate_and_score, generate_and_score_batch
 
 router = APIRouter(tags=["revision"])
 
+### ----------------------------- Semantic Profile ----------------------------- ###
+class SemanticProfileRequest(BaseModel):
+	passage_text: str = Field(..., description="원문 passage 텍스트")
 
+
+class SemanticProfileBatchRequest(BaseModel):
+	passages: List[str] = Field(..., description="여러 원문 텍스트 배열")
+
+class SemanticProfileResponse(BaseModel):
+	discipline: str
+	subtopic_1: str
+	subtopic_2: str
+	central_focus: List[str]
+	key_concepts: List[str]
+	processes_structures: Optional[str] = None
+	setting_context: Optional[str] = None
+	purpose_objective: Optional[str] = None
+	genre_form: Optional[str] = None
+	# 오류 발생 시 포함될 수 있음
+	error: Optional[str] = None
+ 
+class GenSemProfileResponse(BaseModel):
+    # 요청 시 전달받은 고유 식별자 (필수)
+    request_id: str 
+    # 요청 시 전달받은 제목 (선택 사항)
+    title: Optional[str] = None
+    
+    semantic_profile: SemanticProfileResponse
+    
+class SemanticProfileBatchItemV2(BaseModel):
+    request_id: str
+    title: Optional[str] = None
+    passage_text: str
+
+class SemanticProfileBatchRequestV2(BaseModel):
+    items: List[SemanticProfileBatchItemV2]
+
+@router.post("/semantic-profile", response_model=SemanticProfileResponse)
+async def generate_semantic_profile(req: SemanticProfileRequest):
+	try:
+		result = await generate_semantic_profile_for_passage(req.passage_text)
+		return result
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+	"/semantic-profile:batch",
+	response_model=Union[List[SemanticProfileResponse], List[GenSemProfileResponse]]
+)
+async def generate_semantic_profile_batch(req: Union[SemanticProfileBatchRequestV2, SemanticProfileBatchRequest]):
+	try:
+		# V1: 단순 문자열 배열
+		if isinstance(req, SemanticProfileBatchRequest):
+			profiles = await generate_semantic_profiles_batch(req.passages)
+			return profiles
+
+		# V2: 식별자/제목이 포함된 아이템 배열
+		texts = [item.passage_text for item in req.items]
+		profiles = await generate_semantic_profiles_batch(texts)
+		return [
+			GenSemProfileResponse(
+				request_id=item.request_id,
+				title=item.title,
+				semantic_profile=profiles[idx]
+			)
+			for idx, item in enumerate(req.items)
+		]
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=str(e))
+
+
+class SemanticProfileIn(BaseModel):
+	"""Closeness 비교용 입력 스키마.
+	- purpose_objective ← (purpose_objective | purpose)
+	- genre_form       ← (genre_form | genre)
+	"""
+	model_config = ConfigDict(populate_by_name=True)
+
+	discipline: str
+	subtopic_1: str
+	subtopic_2: Optional[str] = None
+	central_focus: List[str]
+	key_concepts: List[str]
+	processes_structures: Optional[str] = None
+	setting_context: Optional[str] = None
+	purpose_objective: Optional[str] = Field(default=None, validation_alias=AliasChoices("purpose_objective", "purpose"))
+	genre_form: Optional[str] = Field(default=None, validation_alias=AliasChoices("genre_form", "genre"))
+
+
+class TopicClosenessRequest(BaseModel):
+	original_semantic_profile: SemanticProfileIn
+	generated_semantic_profile: SemanticProfileIn
+
+	
+class TopicClosenessResponse(BaseModel):
+	request_id: Optional[str] = None
+	scoring: Dict[str, int]
+	total_points: int
+	closeness_label: int
+	generated_semantic_profile: Optional[SemanticProfileResponse] = None
+
+
+@router.post("/topic-closeness", response_model=TopicClosenessResponse)
+async def topic_closeness(req: TopicClosenessRequest):
+	try:
+		orig = req.original_semantic_profile.model_dump()
+		gen = req.generated_semantic_profile.model_dump()
+		result = await score_topic_closeness(orig, gen)
+		return result
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=str(e))
+
+
+class GenerateAndScoreRequest(BaseModel):
+	request_id: Optional[str] = None
+	original_semantic_profile: Union[SemanticProfileIn, str]
+	passage_text: str
+
+
+class GenerateAndScoreBatchItem(BaseModel):
+	request_id: Optional[str] = None
+	original_semantic_profile: Union[SemanticProfileIn, str]
+	passage_text: str
+
+
+@router.post("/topic-closeness:generate-and-score", response_model=TopicClosenessResponse)
+async def topic_closeness_generate_and_score(req: GenerateAndScoreRequest):
+	try:
+		orig_input = req.original_semantic_profile
+		if isinstance(orig_input, SemanticProfileIn):
+			orig = orig_input.model_dump()
+		else:
+			orig = orig_input  # str
+		result = await generate_and_score(orig, req.passage_text)
+		if req.request_id is not None:
+			result["request_id"] = req.request_id
+		return result
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=str(e))
+
+
+class GenerateAndScoreBatchRequest(BaseModel):
+	items: List[GenerateAndScoreBatchItem] = Field(..., description='[{"request_id": "optional-id", "original_semantic_profile": {...}, "passage_text": "..."}, ...]')
+
+
+@router.post("/topic-closeness:generate-and-score:batch", response_model=List[TopicClosenessResponse])
+async def topic_closeness_generate_and_score_batch(req: GenerateAndScoreBatchRequest):
+	try:
+		items = [item.model_dump() for item in req.items]
+		results = await generate_and_score_batch(items)
+		return results
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=str(e))
+
+##### ----------------------------- Revision ----------------------------- #####
 @router.post(
     "/syntax-fix",
     response_model=SyntaxFixResponse,
@@ -186,3 +348,5 @@ async def batch_revise(request: BatchSyntaxFixRequest):
             total_processing_time=total_time,
             error_message=error_msg
         ) 
+        
+        

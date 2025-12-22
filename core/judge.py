@@ -47,8 +47,8 @@ class MetricsJudge:
             )
             length_pass = length_range.is_within_range(metrics.get('AVG_SENTENCE_LENGTH', 0))
             detailed_metrics["AVG_SENTENCE_LENGTH"] = {
-                "min_value": length_range.min_value,
-                "max_value": length_range.max_value,
+                "min_value": round(length_range.min_value, 3),
+                "max_value": round(length_range.max_value, 3),
                 "current_value": metrics.get('AVG_SENTENCE_LENGTH', 0),
                 "is_pass": length_pass
             }
@@ -60,8 +60,8 @@ class MetricsJudge:
             )
             clause_pass = clause_range.is_within_range(metrics.get('All_Embedded_Clauses_Ratio', 0))
             detailed_metrics["All_Embedded_Clauses_Ratio"] = {
-                "min_value": clause_range.min_value,
-                "max_value": clause_range.max_value,
+                "min_value": round(clause_range.min_value, 3),
+                "max_value": round(clause_range.max_value, 3),
                 "current_value": metrics.get('All_Embedded_Clauses_Ratio', 0),
                 "is_pass": clause_pass
             }

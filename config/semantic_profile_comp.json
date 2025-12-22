@@ -1,0 +1,42 @@
+{
+  "closeness_scoring": {
+    "type": "json_schema",
+    "json_schema": {
+      "name": "closeness_scoring",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "scoring": {
+            "type": "object",
+            "properties": {
+              "discipline_match": {"type": "integer"},
+              "subtopic_match": {"type": "integer"},
+              "central_focus_match": {"type": "integer"},
+              "key_concept_overlap": {"type": "integer"},
+              "process_parallel": {"type": "integer"},
+              "setting_alignment": {"type": "integer"},
+              "purpose_alignment": {"type": "integer"},
+              "genre_alignment": {"type": "integer"},
+              "penalties": {"type": "integer"}
+            },
+            "additionalProperties": false,
+            "required": [
+              "discipline_match",
+              "subtopic_match",
+              "central_focus_match",
+              "key_concept_overlap",
+              "process_parallel",
+              "setting_alignment",
+              "purpose_alignment",
+              "genre_alignment",
+              "penalties"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": ["scoring"]
+      },
+      "strict": true
+    }
+  }
+}

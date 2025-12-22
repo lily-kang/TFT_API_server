@@ -4,7 +4,8 @@ import math
 import json
 from typing import Dict, Any, Optional, List
 from models.request import MasterMetrics, ToleranceAbs, ToleranceRatio
-from config.revision_prompts import SYNTAX_USER_INPUT_TEMPLATE, SYNTAX_PROMPT_DECREASE, SYNTAX_PROMPT_INCREASE, Lexical_USER_INPUT_TEMPLATE, LEXICAL_FIXING_PROMPT_DECREASE, LEXICAL_FIXING_PROMPT_INCREASE, CANDIDATE_SELECTION_PROMPT
+from config.syntax_revision_prompt import SYNTAX_USER_INPUT_TEMPLATE, SYNTAX_PROMPT_DECREASE, SYNTAX_PROMPT_INCREASE, CANDIDATE_SELECTION_PROMPT
+from config.lexical_revision_prompt import Lexical_USER_INPUT_TEMPLATE, LEXICAL_FIXING_PROMPT_DECREASE, LEXICAL_FIXING_PROMPT_INCREASE
 from utils.logging import logger
 
 class PromptBuilder:
@@ -502,7 +503,9 @@ Do not include any explanation, JSON, or additional text. Just the number betwee
         system_prompt = LEXICAL_FIXING_PROMPT_INCREASE if direction == "increase" else LEXICAL_FIXING_PROMPT_DECREASE
         formatted_text_json = self._format_lexical_text_with_metrics(text, current_cefr_ratio, target_min, target_max)
         processed_profile = self._generate_vocab_profile(cefr_breakdown or {}, direction)
-        target_level = "A1/A2" if direction == "increase" else "B1/B2"
+        # A1/A2 NVJD 비율이 높으면 decrease, 목표 레벨은 B1/B2
+        # A1/A2 NVJD 비율이 낮으면 increase, 목표 레벨은 A1/A2
+        target_level = "B1/B2" if direction == "increase" else "A1/A2"
 
         user_prompt = Lexical_USER_INPUT_TEMPLATE.format(
             var_originalText=text,
@@ -544,12 +547,12 @@ Do not include any explanation, JSON, or additional text. Just the number betwee
 
     def _generate_vocab_profile(self, cefr_breakdown: Dict[str, Any], direction: str) -> str:
         """cefr_breakdown을 direction 기준으로 정제하여 출력 문자열 생성
-        - decrease: B1+ (b1,b2,c1,c2)만 표시
-        - increase: A1/A2/B1만 표시
+        - decrease: A1A2 비율을 낮춰야 하니까 A1A2 profile 표시
+        - increase: A1A2 비율을 높여야 하니까 B1+ (b1,b2,c1,c2)만 표시
         """
         try:
-            buckets_increase = ["a1", "a2", "b1"]
-            buckets_decrease = ["b1", "b2", "c1", "c2"]
+            buckets_decrease = ["a1", "a2"]
+            buckets_increase = ["b1", "b2", "c1", "c2"]
             selected = buckets_increase if direction == "increase" else buckets_decrease
 
             lines: List[str] = []

@@ -1,0 +1,25 @@
+{
+    "semantic_profile": {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "semantic_profile",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "discipline": {"type": "string"},
+                    "subtopic_1": {"type": "string"},
+                    "central_focus": {"type": "array", "items": {"type": "string"}},
+                    "key_concepts": {"type": "array", "items": {"type": "string"}},
+                    "processes_structures": {"type": "string"},
+                    "setting_context": {"type": "string"},
+                    "purpose_objective": {"type": "string"},
+                    "genre_form": {"type": "string"}
+                },
+                "required": ["discipline", "subtopic_1", "central_focus", "key_concepts", "processes_structures", "setting_context", "purpose_objective", "genre_form"],
+                "additionalProperties": false
+            },
+            "strict": true
+        }
+    }
+}
+

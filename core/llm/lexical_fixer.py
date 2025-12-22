@@ -8,7 +8,7 @@ from core.analyzer import analyzer
 from core.metrics import metrics_extractor
 from core.judge import judge
 from config.settings import settings
-from config.revision_prompts import Lexical_USER_INPUT_TEMPLATE, LEXICAL_FIXING_PROMPT_INCREASE, LEXICAL_FIXING_PROMPT_DECREASE
+from config.lexical_revision_prompt import Lexical_USER_INPUT_TEMPLATE, LEXICAL_FIXING_PROMPT_INCREASE, LEXICAL_FIXING_PROMPT_DECREASE
 from models.request import MasterMetrics, ToleranceRatio
 from models.internal import LLMCandidate, LLMResponse
 from utils.exceptions import LLMAPIError
@@ -216,11 +216,15 @@ class LexicalFixer:
                 oc = c.get("original_clause")
                 rc = c.get("revised_clause")
                 is_ok = bool(c.get("is_ok", True))
+                alts = c.get("alternatives") or []
+                if not isinstance(alts, list):
+                    alts = []
                 if oc and rc:
                     norm_corr.append({
                         "original_clause": oc,
                         "revised_clause": rc,
-                        "is_ok": is_ok
+                        "is_ok": is_ok,
+                        "alternatives": alts, 
                     })
             if st_id is not None:
                 normalized.append({
@@ -248,7 +252,7 @@ class LexicalFixer:
         return sorted(by_st.values(), key=lambda r: r["st_id"])
 
     def _merge_sheet_data(self, sheet_datas: List[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
-        """여러 후보의 sheet_data를 st_id 기준으로 취합하고 동일 corrections 중복 제거"""
+        """여러 후보의 sheet_data를 st_id 기준으로 취합하고 동일 corrections 중복 제거 (alternatives 병합 포함)"""
         merged_by_st: Dict[int, Dict[str, Any]] = {}
         for sheet in sheet_datas:
             for row in sheet:
@@ -259,17 +263,37 @@ class LexicalFixer:
                 # original_sentence 채우기 (비어있으면 최초 값 사용)
                 if not target.get("original_sentence") and row.get("original_sentence"):
                     target["original_sentence"] = row.get("original_sentence")
-                # corrections 병합 (중복 제거)
-                exist_set = set((c.get("original_clause"), c.get("revised_clause")) for c in target["corrections"])
-                for c in row.get("corrections", []) or []:
-                    key = (c.get("original_clause"), c.get("revised_clause"))
-                    if key not in exist_set and c.get("original_clause") and c.get("revised_clause"):
-                        target["corrections"].append({
-                            "original_clause": c.get("original_clause"),
-                            "revised_clause": c.get("revised_clause"),
-                            "is_ok": bool(c.get("is_ok", True))
-                        })
-                        exist_set.add(key)
+                # corrections 병합 (중복 제거, alternatives 포함)
+                exist_map: Dict[tuple, Dict[str, Any]] = {
+                    (c.get("original_clause"), c.get("revised_clause")): c for c in target["corrections"]
+                }
+                for c in (row.get("corrections", []) or []):
+                    oc = c.get("original_clause")
+                    rc = c.get("revised_clause")
+                    if not oc or not rc:
+                        continue
+                    key = (oc, rc)
+                    alts = c.get("alternatives") or []
+                    if not isinstance(alts, list):
+                        alts = []
+                    if key in exist_map:
+                        existing = exist_map[key]
+                        existing_alts = existing.get("alternatives") or []
+                        if not isinstance(existing_alts, list):
+                            existing_alts = []
+                        # union alternatives (string set)
+                        existing["alternatives"] = list({*map(str, existing_alts), *map(str, alts)})
+                        # combine is_ok conservatively
+                        existing["is_ok"] = bool(existing.get("is_ok", True) and c.get("is_ok", True))
+                    else:
+                        new_item = {
+                            "original_clause": oc,
+                            "revised_clause": rc,
+                            "is_ok": bool(c.get("is_ok", True)),
+                            "alternatives": alts,
+                        }
+                        target["corrections"].append(new_item)
+                        exist_map[key] = new_item
         # st_id 기준 정렬
         return sorted(merged_by_st.values(), key=lambda r: r["st_id"])
     
