@@ -499,7 +499,7 @@ class TextProcessingService:
 
                     step_results.append(StepResult(
                         step_name="구문 수정",
-                        status=f"[revise] syntax revision success & vocab PASS",
+                        status=f"[revise] syntax revision success & vocab {selected_candidate_lexical_pass}",
                         success=True,
                         processing_time=time.time() - t2,
                         details={
@@ -516,20 +516,20 @@ class TextProcessingService:
                     ))
                     
                     # 어휘 수정 단계 기록 (어휘 PASS로 별도 수정 불필요)
-                    step_results.append(StepResult(
-                        step_name="어휘 수정",
-                        status="[revise] lexical check PASS (no lexical fixing needed)",
-                        success=True,
-                        processing_time=0.0,
-                        details={
-                            "skipped": True,
-                            "reason": "구문 수정된 지문이 어휘 지표도 통과하여 어휘 수정 불필요",
-                            "lexical_pass": selected_candidate_lexical_pass,
-                            "cefr_a1a2_ratio": lex_current,
-                            "target_min": lex_target_min,
-                            "target_max": lex_target_max
-                        }
-                    ))
+                    # step_results.append(StepResult(
+                    #     step_name="어휘 수정",
+                    #     status="[revise] lexical check PASS (no lexical fixing needed)",
+                    #     success=True,
+                    #     processing_time=0.0,
+                    #     details={
+                    #         "skipped": True,
+                    #         "reason": "구문 수정된 지문이 어휘 지표도 통과하여 어휘 수정 불필요",
+                    #         "lexical_pass": selected_candidate_lexical_pass,
+                    #         "cefr_a1a2_ratio": lex_current,
+                    #         "target_min": lex_target_min,
+                    #         "target_max": lex_target_max
+                    #     }
+                    # ))
 
                 except Exception as e:
                     step_results.append(StepResult(

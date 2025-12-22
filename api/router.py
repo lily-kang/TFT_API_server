@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, ConfigDict, AliasChoices
 from typing import List, Optional, Dict, Any, Union
 from core.services.text_processing_service_v2 import text_processing_service
-from models.request import SyntaxFixRequest, BatchSyntaxFixRequest
+from models.request import SyntaxFixRequest, BatchSyntaxFixRequest, semanticProfileRequest, BatchSemProfileRequest
 from models.response import SyntaxFixResponse, BatchSyntaxFixResponse
 from models.internal import AnalyzerRequest
 from core.analyzer import analyzer
@@ -24,7 +24,6 @@ class SemanticProfileRequest(BaseModel):
 class SemanticProfileBatchRequest(BaseModel):
 	passages: List[str] = Field(..., description="여러 원문 텍스트 배열")
 
-
 class SemanticProfileResponse(BaseModel):
 	discipline: str
 	subtopic_1: str
@@ -37,7 +36,22 @@ class SemanticProfileResponse(BaseModel):
 	genre_form: Optional[str] = None
 	# 오류 발생 시 포함될 수 있음
 	error: Optional[str] = None
+ 
+class GenSemProfileResponse(BaseModel):
+    # 요청 시 전달받은 고유 식별자 (필수)
+    request_id: str 
+    # 요청 시 전달받은 제목 (선택 사항)
+    title: Optional[str] = None
+    
+    semantic_profile: SemanticProfileResponse
+    
+class SemanticProfileBatchItemV2(BaseModel):
+    request_id: str
+    title: Optional[str] = None
+    passage_text: str
 
+class SemanticProfileBatchRequestV2(BaseModel):
+    items: List[SemanticProfileBatchItemV2]
 
 @router.post("/semantic-profile", response_model=SemanticProfileResponse)
 async def generate_semantic_profile(req: SemanticProfileRequest):
@@ -48,11 +62,28 @@ async def generate_semantic_profile(req: SemanticProfileRequest):
 		raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/semantic-profile:batch", response_model=List[SemanticProfileResponse])
-async def generate_semantic_profile_batch(req: SemanticProfileBatchRequest):
+@router.post(
+	"/semantic-profile:batch",
+	response_model=Union[List[SemanticProfileResponse], List[GenSemProfileResponse]]
+)
+async def generate_semantic_profile_batch(req: Union[SemanticProfileBatchRequestV2, SemanticProfileBatchRequest]):
 	try:
-		results = await generate_semantic_profiles_batch(req.passages)
-		return results
+		# V1: 단순 문자열 배열
+		if isinstance(req, SemanticProfileBatchRequest):
+			profiles = await generate_semantic_profiles_batch(req.passages)
+			return profiles
+
+		# V2: 식별자/제목이 포함된 아이템 배열
+		texts = [item.passage_text for item in req.items]
+		profiles = await generate_semantic_profiles_batch(texts)
+		return [
+			GenSemProfileResponse(
+				request_id=item.request_id,
+				title=item.title,
+				semantic_profile=profiles[idx]
+			)
+			for idx, item in enumerate(req.items)
+		]
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=str(e))
 

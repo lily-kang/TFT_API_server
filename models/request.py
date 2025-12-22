@@ -48,3 +48,11 @@ class BatchSyntaxFixRequest(BaseModel):
     request_id: str = Field(description="배치 요청 ID")
     items: List[SyntaxFixRequest] = Field(description="구문 수정할 텍스트 리스트")
     max_concurrent: Optional[int] = Field(default=10, description="최대 동시 처리 개수 (기본값: 10)") 
+
+class semanticProfileRequest(BaseModel):
+    """시멘틱 프로필 요청 모델"""
+    title: str = Field(description="지문 제목")
+    text: str = Field(description="수정할 텍스트")
+
+class BatchSemProfileRequest(BaseModel):
+    items: List[semanticProfileRequest] = Field(description="semantic profile 생성할 텍스트 리스트")
