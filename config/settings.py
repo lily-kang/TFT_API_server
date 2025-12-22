@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     # LLM 설정 - 구문 수정용 temperature (각 temperature별로 2개씩 생성)
     llm_temperatures: list = [0.2, 0.3]
     syntax_candidates_per_temperature: int = 2  # 각 temperature별 생성할 후보 수
+    llm_max_output_tokens: int = 4096
     
     # 기본 허용 오차 설정
     default_tolerance_abs: Dict[str, float] = {
