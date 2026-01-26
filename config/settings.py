@@ -1,6 +1,7 @@
 import os
-from typing import Dict, Any
-from pydantic_settings import BaseSettings
+from typing import Dict
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from dotenv import load_dotenv
 
 # .env 파일 자동 로드
@@ -9,16 +10,23 @@ load_dotenv()
 
 class Settings(BaseSettings):
     """애플리케이션 설정 관리"""
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
     
     # 외부 API 설정
     external_analyzer_api_url: str = "https://ils.jp.ngrok.io/api/enhanced_analyze"
     
     # OpenAI API 설정
-    openai_api_key: str = os.getenv("OPENAI_API_KEY")
+    # Cloud Run에서는 Secret/Env로 주입되는 경우가 많아, 미설정 상태에서도 서버가 부팅되도록 Optional 허용
+    # pydantic-settings에서 env var 이름 매핑은 `validation_alias`가 확실함
+    openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
     openai_model: str = "gpt-4.1"
     
     # 앱 설정
-    debug: bool = True
+    debug: bool = False
     log_level: str = "INFO"
     
     # 파이프라인 설정
@@ -40,10 +48,5 @@ class Settings(BaseSettings):
         "CEFR_NVJD_A1A2_lemma_ratio": 0.104
     }
     
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-
-
 # 전역 설정 인스턴스
 settings = Settings() 

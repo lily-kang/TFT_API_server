@@ -10,8 +10,6 @@ from core.llm.syntax_fixer import syntax_fixer
 from core.llm.lexical_fixer import lexical_fixer
 from core.llm.prompt_builder import prompt_builder
 from utils.logging import logger
-import nltk
-nltk.download('punkt')
 
 class TextProcessingService:
     """텍스트 처리 서비스 (구문/어휘 수정)"""

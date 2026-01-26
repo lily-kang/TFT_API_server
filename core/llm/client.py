@@ -1,9 +1,20 @@
 import openai
 import asyncio
+import os
+import re
 from typing import List, Optional
 from config.settings import settings
 from utils.exceptions import LLMAPIError
 from utils.logging import logger
+
+_API_KEY_REDACT_RE = re.compile(r"sk-[A-Za-z0-9]{16,}")
+
+def _sanitize_err(msg: str) -> str:
+    """에러 문자열에서 민감한 토큰 형태를 간단히 마스킹."""
+    try:
+        return _API_KEY_REDACT_RE.sub("sk-***REDACTED***", msg)
+    except Exception:
+        return "(unavailable)"
 
 class LLMClientForProfile:
     """OpenAI LLM API 클라이언트"""
@@ -11,6 +22,7 @@ class LLMClientForProfile:
     def __init__(self):
         self.model = settings.openai_model
         self._client = None
+        self._client_init_error: Optional[str] = None
     
         
     @property
@@ -18,10 +30,18 @@ class LLMClientForProfile:
         """Lazy initialization으로 OpenAI 클라이언트 생성"""
         if self._client is None:
             try:
-                self._client = openai.OpenAI(api_key=settings.openai_api_key)
+                api_key = (settings.openai_api_key or os.getenv("OPENAI_API_KEY") or "").strip()
+                if not api_key:
+                    self._client_init_error = "OPENAI_API_KEY is missing/empty"
+                    logger.error("OPENAI_API_KEY가 설정되지 않아 OpenAI 클라이언트를 초기화할 수 없습니다.")
+                    self._client = None
+                    return None
+                self._client = openai.OpenAI(api_key=api_key)
+                self._client_init_error = None
                 logger.info("OpenAI 클라이언트 초기화 성공")
             except Exception as e:
-                logger.error(f"OpenAI 클라이언트 초기화 실패: {e}")
+                self._client_init_error = f"{type(e).__name__}: {_sanitize_err(str(e))}"
+                logger.error(f"OpenAI 클라이언트 초기화 실패: {self._client_init_error}")
                 self._client = None
         return self._client
     
@@ -42,7 +62,9 @@ class LLMClientForProfile:
         """
         try:
             if not self.client:
-                raise LLMAPIError("OpenAI 클라이언트가 초기화되지 않았습니다")
+                reason = self._client_init_error
+                suffix = f": {reason}" if reason else ""
+                raise LLMAPIError(f"OpenAI 클라이언트가 초기화되지 않았습니다{suffix}")
             
             # response_format 준비 (파일 경로/사전 모두 허용)
             prepared_response_format = None
@@ -168,6 +190,7 @@ class LLMClient:
     def __init__(self):
         self.model = settings.openai_model
         self._client = None
+        self._client_init_error: Optional[str] = None
         self.temperatures = settings.llm_temperatures
         self.candidates_per_temperature = settings.syntax_candidates_per_temperature
         
@@ -176,10 +199,18 @@ class LLMClient:
         """Lazy initialization으로 OpenAI 클라이언트 생성"""
         if self._client is None:
             try:
-                self._client = openai.OpenAI(api_key=settings.openai_api_key)
+                api_key = (settings.openai_api_key or os.getenv("OPENAI_API_KEY") or "").strip()
+                if not api_key:
+                    self._client_init_error = "OPENAI_API_KEY is missing/empty"
+                    logger.error("OPENAI_API_KEY가 설정되지 않아 OpenAI 클라이언트를 초기화할 수 없습니다.")
+                    self._client = None
+                    return None
+                self._client = openai.OpenAI(api_key=api_key)
+                self._client_init_error = None
                 logger.info("OpenAI 클라이언트 초기화 성공")
             except Exception as e:
-                logger.error(f"OpenAI 클라이언트 초기화 실패: {e}")
+                self._client_init_error = f"{type(e).__name__}: {_sanitize_err(str(e))}"
+                logger.error(f"OpenAI 클라이언트 초기화 실패: {self._client_init_error}")
                 self._client = None
         return self._client
     
@@ -200,7 +231,9 @@ class LLMClient:
         """
         try:
             if not self.client:
-                raise LLMAPIError("OpenAI 클라이언트가 초기화되지 않았습니다")
+                reason = self._client_init_error
+                suffix = f": {reason}" if reason else ""
+                raise LLMAPIError(f"OpenAI 클라이언트가 초기화되지 않았습니다{suffix}")
             
             # 동기 호출 사용 (openai 라이브러리의 최신 버전에서는 동기 호출이 기본)
             response = self.client.chat.completions.create(

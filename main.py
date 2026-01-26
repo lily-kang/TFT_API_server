@@ -3,6 +3,7 @@ from api.router import router as pipeline_router
 from api.analyzer import router as analyzer_router
 from utils.logging import setup_logging
 from config.settings import settings
+import os
 
 # 로깅 초기화
 logger = setup_logging()
@@ -36,16 +37,20 @@ async def health_check():
         "settings": {
             "debug": settings.debug,
             "external_api": settings.external_analyzer_api_url,
-            "llm_model": settings.openai_model
+            "llm_model": settings.openai_model,
+            # 키 값은 절대 노출하지 않고, 설정 여부만 반환
+            "openai_api_key_configured": bool((settings.openai_api_key or os.getenv("OPENAI_API_KEY") or "").strip())
         }
     }
 
 
 if __name__ == "__main__":
     import uvicorn
+    import os
+    port = int(os.getenv("PORT", "8080"))
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8510,
+        port=port,
         reload=settings.debug
     )
