@@ -16,10 +16,15 @@ class MetricsData(BaseModel):
     AVG_SENTENCE_LENGTH: float
     All_Embedded_Clauses_Ratio: float
     CEFR_NVJD_A1A2_lemma_ratio: float
-    # 기타 지표들도 포함할 수 있음
-    # AVG_CONTENT_SYLLABLES: Optional[float] = None
-    # CL_CEFR_B1B2C1C2_ratio: Optional[float] = None
-    # PP_Weighted_Ratio: Optional[float] = None
+    # 어휘 수정을 위한 추가 필드들
+    content_lemmas: Optional[int] = None
+    propn_lemma_count: Optional[int] = None
+    cefr_a1_NVJD_lemma_count: Optional[int] = None
+    cefr_a2_NVJD_lemma_count: Optional[int] = None
+    cefr_breakdown: Optional[Dict] = None
+    sentence_count: Optional[int] = None
+    lexical_tokens: Optional[int] = None
+    total_clause_sentences: Optional[int] = None
 
 
 class EvaluationResult(BaseModel):

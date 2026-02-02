@@ -37,13 +37,14 @@ class MetricsExtractor:
             text_statistics = data.get("text_statistics", {})
             # logger.info(f"📈 text_statistics 키: {list(text_statistics.keys())}")
             
-            # 테이블 추출
+            # 분석기 API 응답 테이블 추출
+            # table_XX: 외부 분석기의 표준 응답 테이블 구조
             basic_overview = text_statistics.get("table_01_basic_overview", {})
-            table_02 = text_statistics.get("table_02_detailed_tokens", {})
+            table_02 = text_statistics.get("table_02_detailed_tokens", {})  # 상세 토큰 정보
             syntax_analysis = text_statistics.get("table_10_syntax_analysis", {})
-            table_11 = text_statistics.get("table_11_lemma_metrics", {})
-            table_09 = text_statistics.get("table_09_pos_distribution", {})
-            table_12 = text_statistics.get("table_12_unique_lemma_list", {})
+            table_11 = text_statistics.get("table_11_lemma_metrics", {})  # 렘마 지표
+            table_09 = text_statistics.get("table_09_pos_distribution", {})  # 품사 분포
+            table_12 = text_statistics.get("table_12_unique_lemma_list", {})  # 고유 렘마 목록
             
             # 1. 평균 문장 길이
             avg_sentence_length = basic_overview.get("avg_sentence_length", 0.0)
@@ -51,7 +52,7 @@ class MetricsExtractor:
             logger.info(f"✅ avg_sentence_length: {avg_sentence_length}")
             logger.info(f"✅ sentence_count: {sentence_count}")
             
-            # lexical_tokens 추출 (t2 테이블에서)
+            # lexical_tokens 추출 (table_02에서)
             lexical_tokens = table_02.get("lexical_tokens", 0)
             logger.info(f"✅ lexical_tokens: {lexical_tokens}")
             
@@ -94,33 +95,32 @@ class MetricsExtractor:
             # logger.info(f"📊 cefr_a2_NVJD_lemma_ratio: {cefr_a2_ratio}")
             logger.info(f"✅ CEFR_NVJD_A1A2_lemma_ratio: {cefr_a1a2_ratio}")
             
-            # 최종 결과
-            extracted = {
-                "AVG_SENTENCE_LENGTH": round(float(avg_sentence_length), 3),
-                "All_Embedded_Clauses_Ratio": round(float(all_embedded_clauses_ratio), 3),
-                "CEFR_NVJD_A1A2_lemma_ratio": round(float(cefr_a1a2_ratio), 3),
-                # NVJD 기반 어휘 카운트 (어휘 수정 단어 수 계산을 위해 노출)
-                "content_lemmas": int(content_lemmas),
-                "propn_lemma_count": int(propn_lemma_count),
-                "cefr_a1_NVJD_lemma_count": int(NVJD_a1_count),
-                "cefr_a2_NVJD_lemma_count": int(NVJD_a2_count),
-                # 어휘 프로파일 생성을 위한 breakdown 원본
-                "cefr_breakdown": table_12.get("cefr_breakdown", {}),
-                "sentence_count": sentence_count,
-                "lexical_tokens": lexical_tokens,
-                "total_clause_sentences": total_clause_sentences
-            }
-            
+            # MetricsData 인스턴스 생성 (Pydantic 모델)
+            metrics_data = MetricsData(
+                AVG_SENTENCE_LENGTH=round(float(avg_sentence_length), 3),
+                All_Embedded_Clauses_Ratio=round(float(all_embedded_clauses_ratio), 3),
+                CEFR_NVJD_A1A2_lemma_ratio=round(float(cefr_a1a2_ratio), 3),
+                # 어휘 수정을 위한 추가 필드들
+                content_lemmas=int(content_lemmas),
+                propn_lemma_count=int(propn_lemma_count),
+                cefr_a1_NVJD_lemma_count=int(NVJD_a1_count),
+                cefr_a2_NVJD_lemma_count=int(NVJD_a2_count),
+                cefr_breakdown=table_12.get("cefr_breakdown", {}),
+                sentence_count=sentence_count,
+                lexical_tokens=lexical_tokens,
+                total_clause_sentences=total_clause_sentences
+            )
+
             logger.info("\n" + "="*60)
             logger.info("🎯 최종 추출된 지표")
             logger.info("="*60)
-            logger.info(f"✅ AVG_SENTENCE_LENGTH: {extracted.get('AVG_SENTENCE_LENGTH', 0):.3f}")
-            logger.info(f"✅ All_Embedded_Clauses_Ratio: {extracted.get('All_Embedded_Clauses_Ratio', 0):.3f}")
-            logger.info(f"✅ CEFR_NVJD_A1A2_lemma_ratio: {extracted.get('CEFR_NVJD_A1A2_lemma_ratio', 0):.3f}")
-            logger.info(f"✅ NVJD counts - content_lemmas={extracted.get('content_lemmas')}, propn_lemma_count={extracted.get('propn_lemma_count')}, A1={extracted.get('cefr_a1_NVJD_lemma_count')}, A2={extracted.get('cefr_a2_NVJD_lemma_count')}")
+            logger.info(f"✅ AVG_SENTENCE_LENGTH: {metrics_data.AVG_SENTENCE_LENGTH:.3f}")
+            logger.info(f"✅ All_Embedded_Clauses_Ratio: {metrics_data.All_Embedded_Clauses_Ratio:.3f}")
+            logger.info(f"✅ CEFR_NVJD_A1A2_lemma_ratio: {metrics_data.CEFR_NVJD_A1A2_lemma_ratio:.3f}")
+            logger.info(f"✅ NVJD counts - content_lemmas={metrics_data.content_lemmas}, propn_lemma_count={metrics_data.propn_lemma_count}, A1={metrics_data.cefr_a1_NVJD_lemma_count}, A2={metrics_data.cefr_a2_NVJD_lemma_count}")
             logger.info("="*60)
-            
-            return extracted
+
+            return metrics_data
             
         except Exception as e:
             logger.error(f"지표 추출 실패: {str(e)}")

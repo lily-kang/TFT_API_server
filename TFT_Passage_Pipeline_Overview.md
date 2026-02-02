@@ -41,21 +41,24 @@
 ```mermaid
 graph TB
     Start[지문 생성 요청] --> Gen[1. Passage Generator<br/>LLM으로 지문 생성]
-    Gen --> SP[2. Semantic Profile 생성<br/>의미 프로필 추출]
-    SP --> TC[3. Topic Closeness Filter<br/>토픽 유사도 검사]
+    Gen --> InitFilter[2. 1차 기계 검수<br/>ILS Text Analyzer]
+    InitFilter --> |2개 지표 검증| InitDecision{±1.9σ 범위<br/>통과?}
+    InitDecision --> |Fail| DiscardInit[❌ Discard]
+    InitDecision --> |Pass| SP[3. Semantic Profile 생성<br/>의미 프로필 추출]
+    SP --> TC[4. Topic Closeness Filter<br/>토픽 유사도 검사]
     TC --> |유사도 1~5 판정| TCDecision{유사도<br/>적절한가?}
     TCDecision --> |부적절| Discard1[❌ Discard]
-    TCDecision --> |적절| Validate[4. Validation Chain<br/>LLM Reviewer 검증]
+    TCDecision --> |적절| Validate[5. Validation Chain<br/>LLM Reviewer 검증]
     Validate --> |부적절| Discard2[❌ Discard]
-    Validate --> |적절| Analyze[5. Text Analyzer<br/>3가지 지표 분석]
+    Validate --> |적절| Analyze[6. Text Analyzer<br/>3가지 지표 분석]
     
     Analyze --> Decision{Case 분류}
     
     Decision --> |Case A<br/>모두 통과| Final1[✅ Final 지문]
     
-    Decision --> |Case B<br/>구문 통과<br/>어휘 미달| LexFix[7. Lexical Revision<br/>어휘 수정 모듈]
+    Decision --> |Case B<br/>구문 통과<br/>어휘 미달| LexFix[8. Lexical Revision<br/>어휘 수정 모듈]
     
-    Decision --> |Case C<br/>구문 미달| SynFix[6. Syntax Revision<br/>구문 수정 모듈]
+    Decision --> |Case C<br/>구문 미달| SynFix[7. Syntax Revision<br/>구문 수정 모듈]
     
     SynFix --> SynAnalyze[재분석]
     SynAnalyze --> SynCheck{구문<br/>통과?}
@@ -72,6 +75,7 @@ graph TB
     style Final1 fill:#90EE90
     style Final2 fill:#90EE90
     style Final3 fill:#90EE90
+    style DiscardInit fill:#FFB6C6
     style Discard1 fill:#FFB6C6
     style Discard2 fill:#FFB6C6
     style Discard3 fill:#FFB6C6
@@ -114,7 +118,75 @@ graph TB
 
 ---
 
-### 2️⃣ Semantic Profile Generator (의미 프로필 생성)
+### 2️⃣ 1차 기계 검수 (Initial Metrics Filter)
+
+**역할**: ILS Text Analyzer API를 사용하여 생성된 지문의 기본 품질을 정량적으로 검증합니다.
+
+**목적**: 
+- 명백히 부적합한 지문을 조기에 필터링하여 후속 처리 비용 절감
+- 통계적 기준(±1.9 sigma)으로 객관적인 1차 검수 수행
+
+**검증 지표 (2개)**:
+
+1. **AVG_SENTENCE_LENGTH** (평균 문장 길이)
+   - 원본 교재의 평균 문장 길이 기준
+   - 허용 범위: `Master ± 1.9σ`
+
+2. **CEFR_NVJD_A1A2_lemma_ratio** (CEFR A1+A2 어휘 비율)
+   - 원본 교재의 A1/A2 레벨 어휘 비율 기준
+   - 허용 범위: `Master ± 1.9σ`
+
+**판정 기준**:
+
+```python
+# 두 지표 모두 ±1.9 sigma 범위 내에 있어야 Pass
+if (abs(current_avg_length - master_avg_length) <= 1.9 * sigma_avg_length) and \
+   (abs(current_cefr_ratio - master_cefr_ratio) <= 1.9 * sigma_cefr_ratio):
+    result = "PASS"  # 다음 단계로 진행
+else:
+    result = "FAIL"  # Discard
+```
+
+**통과 기준 예시**:
+
+| 지표 | Master | Sigma (σ) | 허용 범위 (±1.9σ) | 현재값 | 결과 |
+|------|--------|-----------|-------------------|--------|------|
+| AVG_SENTENCE_LENGTH | 12.3 | 1.5 | [9.45 ~ 15.15] | 13.2 | ✅ Pass |
+| CEFR_A1A2_ratio | 0.46 | 0.08 | [0.308 ~ 0.612] | 0.52 | ✅ Pass |
+
+**API 엔드포인트**:
+```
+POST https://ils.jp.ngrok.io/api/enhanced_analyze
+```
+
+**요청 형식**:
+```json
+{
+  "text": "생성된 지문",
+  "auto_sentence_split": true,
+  "include_syntax_analysis": false
+}
+```
+
+**응답 형식**:
+```json
+{
+  "AVG_SENTENCE_LENGTH": 13.2,
+  "CEFR_NVJD_A1A2_lemma_ratio": 0.52
+}
+```
+
+**처리 결과**:
+- **Pass**: Semantic Profile 생성 단계로 진행
+- **Fail**: 지문 폐기 (Discard), 새로운 지문 생성 필요
+
+**구현 위치**: `core/analyzer.py` (기존 Text Analyzer와 동일한 API 사용)
+
+> **참고**: 이 단계는 3가지 지표를 모두 검증하는 "Text Analyzer" 단계와 달리, 2개 지표만 빠르게 검증하여 초기 필터링을 수행합니다. 더 엄격한 기준(±1.9σ)을 사용하여 명백히 부적합한 지문을 조기에 제거합니다.
+
+---
+
+### 3️⃣ Semantic Profile Generator (의미 프로필 생성)
 
 **역할**: 생성된 지문의 의미적 특성을 구조화된 프로필로 추출합니다.
 
@@ -153,7 +225,7 @@ Animals:
 
 ---
 
-### 3️⃣ Topic Closeness Filter (토픽 유사도 필터)
+### 4️⃣ Topic Closeness Filter (토픽 유사도 필터)
 
 **역할**: 생성된 지문이 원본 교재와 적절한 거리를 유지하는지 평가합니다.
 
@@ -185,20 +257,130 @@ Animals:
 
 ---
 
-### 4️⃣ Validation Chain (LLM Reviewer)
+### 5️⃣ Validation Chain (LLM Reviewer)
 
-**역할**: LLM을 사용하여 지문의 적절성을 최종 검증합니다.
+**역할**: 4단계의 순차적 LLM 호출을 통해 지문을 다각도로 검증하고 수정합니다. Human validation 을 대체하기 위한 목적입니다.
 
-**검증 항목**:
-- 부적절한 내용 포함 여부
-- 교육 목적에 부합하는지
-- 학습자 레벨에 적합한지
-
-> 이 단계는 PDF에 명시되어 있으나, 현재 코드베이스에서는 명시적으로 구현되지 않은 것으로 보입니다.
+**핵심 특징**:
+- 각 LLM 호출의 출력이 다음 LLM 호출의 입력이 되는 **체인 구조**
+- 각 단계는 서로 다른 관점에서 지문을 검증하고 개선
+- 최종 출력은 4단계 검증을 모두 통과한 정제된 지문
 
 ---
 
-### 5️⃣ Text Analyzer (텍스트 분석기)
+#### 4단계 검증 프로세스
+
+```mermaid
+graph LR
+    Input[생성된 지문] --> LLM1[LLM Call 1<br/>Genre Mismatch]
+    LLM1 --> |OUTPUT_PASSAGE_1| LLM2[LLM Call 2<br/>Awkward/Unnatural<br/>Content]
+    LLM2 --> |OUTPUT_PASSAGE_2| LLM3[LLM Call 3<br/>Typos/Grammatical<br/>Errors]
+    LLM3 --> |OUTPUT_PASSAGE_3| LLM4[LLM Call 4<br/>Logical/Factual<br/>Inaccuracy]
+    LLM4 --> |OUTPUT_PASSAGE_4| Output[검증된 지문]
+    
+    style LLM1 fill:#E3F2FD
+    style LLM2 fill:#F3E5F5
+    style LLM3 fill:#E8F5E9
+    style LLM4 fill:#FFF3E0
+    style Output fill:#90EE90
+```
+
+---
+
+#### LLM Call 1: Genre Mismatch (장르 불일치 검증)
+
+**검증 항목**:
+- 지정된 장르(Genre)와 지문 내용이 일치하는지 확인
+- 장르별 특성(톤, 구조, 어휘 선택)이 적절한지 평가
+
+**예시**:
+- **Expository** 지문인데 narrative 요소가 과도하게 포함된 경우
+- **Argumentative** 지문인데 주장이 명확하지 않은 경우
+
+**출력**: `{OUTPUT_TITLE_1}`, `{OUTPUT_PASSAGE_1}`
+
+---
+
+#### LLM Call 2: Awkward/Unnatural Content (부자연스러운 내용 검증)
+
+**검증 항목**:
+- 어색하거나 부자연스러운 표현 식별
+- 문맥상 어울리지 않는 내용 수정
+- 교육용 지문으로서 적절성 평가
+
+**예시**:
+- 갑작스러운 주제 전환
+- 논리적 흐름이 끊기는 부분
+- 학습자 레벨에 맞지 않는 복잡한 개념
+
+**입력**: `{OUTPUT_PASSAGE_1}` (이전 단계 출력)  
+**출력**: `{OUTPUT_TITLE_2}`, `{OUTPUT_PASSAGE_2}`
+
+---
+
+#### LLM Call 3: Typos/Grammatical Errors (오타/문법 오류 검증)
+
+**검증 항목**:
+- 철자 오류(Typos) 수정
+- 문법적 오류(Grammatical Errors) 교정
+- 구두점 사용의 적절성 확인
+
+**예시**:
+- 주어-동사 불일치
+- 시제 오류
+- 관사(a/an/the) 누락 또는 오용
+- 쉼표, 마침표 등 구두점 오류
+
+**입력**: `{OUTPUT_PASSAGE_2}` (이전 단계 출력)  
+**출력**: `{OUTPUT_TITLE_3}`, `{OUTPUT_PASSAGE_3}`
+
+---
+
+#### LLM Call 4: Logical/Factual Inaccuracy (논리적/사실적 부정확성 검증)
+
+**검증 항목**:
+- 논리적 모순이나 비약 확인
+- 사실적 오류(Factual Inaccuracy) 검증
+- 인과관계의 타당성 평가
+
+**예시**:
+- 과학적으로 부정확한 설명
+- 역사적 사실과 다른 내용
+- 논리적으로 연결되지 않는 주장
+
+**입력**: `{OUTPUT_PASSAGE_3}` (이전 단계 출력)  
+**출력**: `{OUTPUT_TITLE_4}`, `{OUTPUT_PASSAGE_4}` (최종 검증된 지문)
+
+---
+
+#### 출력 형식
+
+각 LLM 호출은 다음 형식으로 출력합니다:
+
+```json
+{
+  "OUTPUT_TITLE_X": "수정된 제목",
+  "OUTPUT_PASSAGE_X": "수정된 지문 본문"
+}
+```
+
+**G-sheet 저장 형식**:
+- 각 출력을 별도의 셀에 저장하여 단계별 변화 추적 가능
+- 테스트 및 품질 관리를 위해 모든 중간 출력 보존
+
+**최종 출력**:
+- `{OUTPUT_PASSAGE_4}`: 4단계 검증을 모두 통과한 최종 지문
+- 이 지문이 다음 단계인 **Text Analyzer**로 전달됨
+
+---
+
+#### 구현 상태
+
+> **참고**: 이 4단계 Validation Chain은 현재 설계 단계이며, 코드베이스에는 아직 명시적으로 구현되지 않았습니다. 향후 `core/services/validation_chain.py` 모듈로 구현될 예정입니다.
+
+---
+
+### 6️⃣ Text Analyzer (텍스트 분석기)
 
 **역할**: 외부 API를 호출하여 지문의 구문/어휘 지표를 정량적으로 분석합니다.
 
@@ -230,7 +412,7 @@ POST https://ils.jp.ngrok.io/api/enhanced_analyze
 
 ---
 
-### 6️⃣ Metrics Judge (지표 판정)
+### 6️⃣-1 Metrics Judge (지표 판정)
 
 **역할**: 분석된 지표를 마스터 기준과 비교하여 Pass/Fail을 판단합니다.
 

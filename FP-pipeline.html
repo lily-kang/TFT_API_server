@@ -1,0 +1,2958 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TFT Pipeline - Interactive Guide (Passage & Question)</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        /* ============================================
+           CSS Variables & Reset
+        ============================================ */
+        :root {
+            /* Light Mode Colors */
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --bg-tertiary: #e9ecef;
+            --text-primary: #212529;
+            --text-secondary: #6c757d;
+            --text-muted: #adb5bd;
+
+            /* Dark Mode Colors (will be overridden) */
+            --bg-dark-primary: #1e1e1e;
+            --bg-dark-secondary: #2d2d2d;
+            --bg-dark-tertiary: #3d3d3d;
+            --text-dark-primary: #e0e0e0;
+            --text-dark-secondary: #b0b0b0;
+
+            /* Step Colors */
+            --step-initial: #E3F2FD;
+            --step-llm: #F3E5F5;
+            --step-validation: #E8F5E9;
+            --step-revision: #FFF3E0;
+            --status-success: #90EE90;
+            --status-fail: #FFB6C6;
+
+            /* Accent Colors */
+            --primary: #2563eb;
+            --hero-primary: #9799ee;
+            --primary-hover: #1d4ed8;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+
+            /* Question Pipeline Colors */
+            --question-primary: #7c3aed;
+            --question-hero: #a78bfa;
+            --question-light: #f3e8ff;
+            --question-dark: #6d28d9;
+
+            /* Layout */
+            --sidebar-width: 260px;
+            --header-height: 64px;
+            --border-radius: 8px;
+            --transition-speed: 0.3s;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            transition: background-color var(--transition-speed), color var(--transition-speed);
+        }
+
+        /* ============================================
+           Dark Mode
+        ============================================ */
+        body.dark-mode {
+            --bg-primary: var(--bg-dark-primary);
+            --bg-secondary: var(--bg-dark-secondary);
+            --bg-tertiary: var(--bg-dark-tertiary);
+            --text-primary: var(--text-dark-primary);
+            --text-secondary: var(--text-dark-secondary);
+
+            --step-initial: #1e3a5f;
+            --step-llm: #3d2d4d;
+            --step-validation: #2d4d3d;
+            --step-revision: #4d3d2d;
+            --status-success: #2d5f2d;
+            --status-fail: #5f2d2d;
+        }
+
+        /* ============================================
+           Header
+        ============================================ */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--header-height);
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--bg-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 2rem;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .search-box {
+            position: relative;
+        }
+
+        .search-input {
+            padding: 0.5rem 1rem 0.5rem 2.5rem;
+            border: 1px solid var(--bg-tertiary);
+            border-radius: 20px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            width: 300px;
+            transition: all var(--transition-speed);
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+        }
+
+        .dark-mode-toggle {
+            background: var(--bg-tertiary);
+            border: none;
+            border-radius: 20px;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            transition: all var(--transition-speed);
+        }
+
+        .dark-mode-toggle:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .menu-toggle {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-primary);
+        }
+
+        /* ============================================
+           Sidebar
+        ============================================ */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: var(--header-height);
+            width: var(--sidebar-width);
+            height: calc(100vh - var(--header-height));
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--bg-tertiary);
+            overflow-y: auto;
+            padding: 1.5rem 0;
+            z-index: 999;
+            transition: transform var(--transition-speed);
+        }
+
+        .sidebar.collapsed {
+            transform: translateX(-100%);
+        }
+
+        .nav-section {
+            margin-bottom: 2rem;
+        }
+
+        .nav-section-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            padding: 0 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1.5rem;
+            color: var(--text-primary);
+            text-decoration: none;
+            transition: all var(--transition-speed);
+            cursor: pointer;
+            border-left: 3px solid transparent;
+        }
+
+        .nav-item:hover {
+            background: var(--bg-tertiary);
+            border-left-color: var(--primary);
+        }
+
+        .nav-item.active {
+            background: var(--bg-tertiary);
+            border-left-color: var(--primary);
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .nav-item-number {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--bg-tertiary);
+            font-size: 0.85rem;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .nav-item.active .nav-item-number {
+            background: var(--primary);
+            color: white;
+        }
+
+        .nav-item-text {
+            font-size: 0.9rem;
+            flex: 1;
+        }
+
+        /* ============================================
+           Main Content
+        ============================================ */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            margin-top: var(--header-height);
+            padding: 2rem;
+            min-height: calc(100vh - var(--header-height));
+            transition: margin-left var(--transition-speed);
+        }
+
+        .main-content.expanded {
+            margin-left: 0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* ============================================
+           Hero Section
+        ============================================ */
+        .hero {
+            background: linear-gradient(135deg, var(--hero-primary) 0%, #8d56ed 100%);
+            color: white;
+            padding: 3rem 2rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 3rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .hero h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .hero p {
+            font-size: 1.1rem;
+            opacity: 0.95;
+            max-width: 800px;
+        }
+
+        .hero-stats {
+            display: flex;
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(10px);
+            padding: 1rem 1.5rem;
+            border-radius: var(--border-radius);
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        /* ============================================
+           Section
+        ============================================ */
+        .section {
+            margin-bottom: 4rem;
+            scroll-margin-top: calc(var(--header-height) + 2rem);
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--bg-tertiary);
+        }
+
+        .section-number {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            font-size: 1.25rem;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .section-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            flex: 1;
+        }
+
+        .section-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .badge-generate {
+            background: var(--step-initial);
+            color: #1e40af;
+        }
+
+        .badge-filter {
+            background: var(--step-validation);
+            color: #065f46;
+        }
+
+        .badge-analyze {
+            background: var(--step-llm);
+            color: #7c2d12;
+        }
+
+        .badge-revise {
+            background: var(--step-revision);
+            color: #92400e;
+        }
+
+        .section-content {
+            background: var(--bg-secondary);
+            padding: 2rem;
+            border-radius: var(--border-radius);
+        }
+
+        .subsection {
+            margin-bottom: 2rem;
+        }
+
+        .subsection:last-child {
+            margin-bottom: 0;
+        }
+
+        .subsection-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* ============================================
+           Info Cards
+        ============================================ */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .info-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--bg-tertiary);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            transition: all var(--transition-speed);
+        }
+
+        .info-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .info-card-title {
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .info-card-content {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        /* ============================================
+           Code Block
+        ============================================ */
+        .code-block {
+            background: #282c34;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            margin: 1rem 0;
+        }
+
+        .code-header {
+            background: #21252b;
+            padding: 0.75rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .code-language {
+            color: #abb2bf;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .copy-btn {
+            background: #3e4451;
+            border: none;
+            color: #abb2bf;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .copy-btn:hover {
+            background: #4e5461;
+            color: white;
+        }
+
+        .code-content {
+            padding: 1rem;
+            overflow-x: auto;
+        }
+
+        pre {
+            margin: 0;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            color: #abb2bf;
+        }
+
+        /* ============================================
+           Table
+        ============================================ */
+        .table-container {
+            overflow-x: auto;
+            margin: 1.5rem 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-primary);
+            border-radius: var(--border-radius);
+            overflow: hidden;
+        }
+
+        thead {
+            background: var(--bg-tertiary);
+        }
+
+        th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-primary);
+            border-bottom: 2px solid var(--bg-tertiary);
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--bg-tertiary);
+            color: var(--text-secondary);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover {
+            background: var(--bg-secondary);
+        }
+
+        /* ============================================
+           Alert/Note Box
+        ============================================ */
+        .alert {
+            padding: 1rem 1.5rem;
+            border-radius: var(--border-radius);
+            margin: 1.5rem 0;
+            border-left: 4px solid;
+        }
+
+        .alert-info {
+            background: #dbeafe;
+            border-color: var(--primary);
+            color: #1e40af;
+        }
+
+        .alert-success {
+            background: #d1fae5;
+            border-color: var(--success);
+            color: #065f46;
+        }
+
+        .alert-warning {
+            background: #fef3c7;
+            border-color: var(--warning);
+            color: #92400e;
+        }
+
+        .alert-danger {
+            background: #fee2e2;
+            border-color: var(--danger);
+            color: #991b1b;
+        }
+
+        body.dark-mode .alert-info {
+            background: #1e3a5f;
+            color: #93c5fd;
+        }
+
+        body.dark-mode .alert-success {
+            background: #1e5f3f;
+            color: #86efac;
+        }
+
+        body.dark-mode .alert-warning {
+            background: #5f4f1e;
+            color: #fcd34d;
+        }
+
+        body.dark-mode .alert-danger {
+            background: #5f1e1e;
+            color: #fca5a5;
+        }
+
+        /* ============================================
+           Flowchart Container
+        ============================================ */
+        .flowchart-container {
+            background: var(--bg-secondary);
+            border: 2px solid var(--bg-tertiary);
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            margin: 2rem 0;
+            position: relative;
+        }
+
+        .flowchart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .flowchart-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .flowchart-controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .flowchart-btn {
+            background: var(--bg-tertiary);
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .flowchart-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        #flowchart {
+            width: 100%;
+            height: 600px;
+            border-radius: var(--border-radius);
+            background: var(--bg-primary);
+        }
+
+        /* Flowchart styles */
+        .node {
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .node:hover {
+            filter: brightness(1.1);
+        }
+
+        .node.active {
+            filter: brightness(1.2);
+            stroke: #2563eb;
+            stroke-width: 3px;
+        }
+
+        .node-rect {
+            rx: 8;
+            ry: 8;
+        }
+
+        .node-text {
+            fill: white;
+            font-size: 13px;
+            font-weight: 600;
+            text-anchor: middle;
+            pointer-events: none;
+        }
+
+        .node-subtitle {
+            fill: white;
+            font-size: 10px;
+            opacity: 0.9;
+            text-anchor: middle;
+            pointer-events: none;
+        }
+
+        .link {
+            fill: none;
+            stroke: #94a3b8;
+            stroke-width: 2;
+            marker-end: url(#arrowhead);
+        }
+
+        .link-label {
+            font-size: 11px;
+            fill: var(--text-secondary);
+        }
+
+        /* ============================================
+           Footer
+        ============================================ */
+        .footer {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--bg-tertiary);
+            padding: 2rem;
+            margin-top: 4rem;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        /* ============================================
+           Responsive Design
+        ============================================ */
+        @media (max-width: 1024px) {
+            .search-input {
+                width: 200px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .menu-toggle {
+                display: block;
+            }
+
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .sidebar.show {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .search-input {
+                width: 150px;
+            }
+
+            .hero h1 {
+                font-size: 1.75rem;
+            }
+
+            .hero-stats {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .section-title {
+                font-size: 1.5rem;
+            }
+
+            #flowchart {
+                height: 400px;
+            }
+        }
+
+        /* ============================================
+           Pipeline Tabs
+        ============================================ */
+        .pipeline-tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid var(--bg-tertiary);
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 1rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all var(--transition-speed);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+            background: var(--bg-secondary);
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .tab-btn.active[data-tab="question"] {
+            color: var(--question-primary);
+            border-bottom-color: var(--question-primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Question Pipeline Overrides */
+        .question-pipeline .section-number {
+            background: var(--question-primary);
+        }
+
+        .question-pipeline .badge-generate {
+            background: var(--question-light);
+            color: var(--question-dark);
+        }
+
+        .question-pipeline .badge-analyze {
+            background: var(--question-light);
+            color: var(--question-dark);
+        }
+
+        .question-pipeline .info-card-title {
+            color: var(--question-primary);
+        }
+
+        /* ============================================
+           Utility Classes
+        ============================================ */
+        .mt-1 {
+            margin-top: 0.5rem;
+        }
+
+        .mt-2 {
+            margin-top: 1rem;
+        }
+
+        .mt-3 {
+            margin-top: 1.5rem;
+        }
+
+        .mt-4 {
+            margin-top: 2rem;
+        }
+
+        .mb-1 {
+            margin-bottom: 0.5rem;
+        }
+
+        .mb-2 {
+            margin-bottom: 1rem;
+        }
+
+        .mb-3 {
+            margin-bottom: 1.5rem;
+        }
+
+        .mb-4 {
+            margin-bottom: 2rem;
+        }
+
+        /* ============================================
+           Parameter Examples (Input Params Helper)
+        ============================================ */
+        .param-examples {
+            background: var(--bg-primary);
+            border: 1px solid var(--bg-tertiary);
+            border-radius: var(--border-radius);
+            padding: 1rem 1.25rem;
+        }
+
+        .param-examples-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .param-examples-list {
+            padding-left: 1.25rem;
+            margin: 0;
+        }
+
+        .param-key {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            background: var(--bg-tertiary);
+            padding: 0.1rem 0.35rem;
+            border-radius: 6px;
+            font-size: 0.9em;
+        }
+
+        .param-desc {
+            color: var(--text-secondary);
+        }
+
+        /* ============================================
+           Figures / Images
+        ============================================ */
+        .pipeline-figure {
+            margin-top: 1rem;
+        }
+
+        .pipeline-figure img {
+            display: block;
+            width: 100%;
+            height: auto;
+            border-radius: var(--border-radius);
+            border: 1px solid var(--bg-tertiary);
+            background: var(--bg-primary);
+        }
+
+        .pipeline-figure figcaption {
+            margin-top: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        /* ============================================
+           Dataset Summary (Hero 아래)
+        ============================================ */
+        .kpi-number {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            line-height: 1.1;
+        }
+
+        .kpi-label {
+            margin-top: 0.35rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .kpi-period {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .clean-list {
+            margin: 0.25rem 0 0;
+            padding-left: 1.25rem;
+        }
+
+        .clean-list li {
+            margin: 0.25rem 0;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+            <div class="logo">
+                📚 TFT Pipeline
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" class="search-input" placeholder="Search..." id="searchInput">
+            </div>
+            <button class="dark-mode-toggle" onclick="toggleDarkMode()">
+                <span id="themeIcon">🌙</span>
+                <span id="themeText">Dark</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <nav id="sidebarNav">
+            <!-- Passage Pipeline Navigation (default) -->
+            <div class="nav-content" data-pipeline="passage">
+                <div class="nav-section">
+                    <div class="nav-section-title">Overview</div>
+                    <a href="#overview" class="nav-item active" onclick="setActive(this)">
+                        <span class="nav-item-number">📖</span>
+                        <span class="nav-item-text">시스템 개요</span>
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Pipeline Steps</div>
+                    <a href="#step-1" class="nav-item" onclick="setActive(this)">
+                        <span class="nav-item-number">1</span>
+                        <span class="nav-item-text">Passage Generator</span>
+                    </a>
+                    <a href="#step-2" class="nav-item" onclick="setActive(this)">
+                        <span class="nav-item-number">2</span>
+                        <span class="nav-item-text">Initial Filter</span>
+                    </a>
+                    <a href="#step-3" class="nav-item" onclick="setActive(this)">
+                        <span class="nav-item-number">3</span>
+                        <span class="nav-item-text">Semantic Profile</span>
+                    </a>
+                    <a href="#step-4" class="nav-item" onclick="setActive(this)">
+                        <span class="nav-item-number">4</span>
+                        <span class="nav-item-text">Topic Closeness</span>
+                    </a>
+                    <a href="#step-5" class="nav-item" onclick="setActive(this)">
+                        <span class="nav-item-number">5</span>
+                        <span class="nav-item-text">Validation Chain</span>
+                    </a>
+                    <a href="#step-6" class="nav-item" onclick="setActive(this)">
+                        <span class="nav-item-number">6</span>
+                        <span class="nav-item-text">Text Analyzer</span>
+                    </a>
+                    <a href="#step-7" class="nav-item" onclick="setActive(this)">
+                        <span class="nav-item-number">7</span>
+                        <span class="nav-item-text">Syntax Revision</span>
+                    </a>
+                    <a href="#step-8" class="nav-item" onclick="setActive(this)">
+                        <span class="nav-item-number">8</span>
+                        <span class="nav-item-text">Lexical Revision</span>
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Resources</div>
+                    <a href="#troubleshooting" class="nav-item" onclick="setActive(this)">
+                        <span class="nav-item-number">🔧</span>
+                        <span class="nav-item-text">Troubleshooting</span>
+                    </a>
+                    <a href="#glossary" class="nav-item" onclick="setActive(this)">
+                        <span class="nav-item-number">📖</span>
+                        <span class="nav-item-text">용어 설명</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Question Pipeline Navigation -->
+            <div class="nav-content" data-pipeline="question" style="display: none;">
+                <div class="nav-section">
+                    <div class="nav-section-title">Overview</div>
+                    <a href="#overview" class="nav-item active" onclick="setActive(this)">
+                        <span class="nav-item-number">📖</span>
+                        <span class="nav-item-text">시스템 개요</span>
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Pipeline Steps</div>
+                    <a href="#q-step-1" class="nav-item" onclick="setActive(this)">
+                        <span class="nav-item-number">1</span>
+                        <span class="nav-item-text">Question Generator</span>
+                    </a>
+                    <a href="#q-step-2" class="nav-item" onclick="setActive(this)">
+                        <span class="nav-item-number">2</span>
+                        <span class="nav-item-text">Meta Labeling</span>
+                    </a>
+                    <a href="#q-step-2a" class="nav-item" style="padding-left: 3rem;" onclick="setActive(this)">
+                        <span class="nav-item-number">2a</span>
+                        <span class="nav-item-text">Stem Analysis</span>
+                    </a>
+                    <a href="#q-step-2b" class="nav-item" style="padding-left: 3rem;" onclick="setActive(this)">
+                        <span class="nav-item-number">2b</span>
+                        <span class="nav-item-text">Options Structure</span>
+                    </a>
+                    <a href="#q-step-2c" class="nav-item" style="padding-left: 3rem;" onclick="setActive(this)">
+                        <span class="nav-item-number">2c</span>
+                        <span class="nav-item-text">Options Language</span>
+                    </a>
+                </div>
+            </div>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content" id="mainContent">
+        <div class="container">
+            <!-- Hero Section -->
+            <section class="hero" id="overview">
+                <h1 id="heroTitle">🎯 TFT Passage Generation Pipeline</h1>
+                <p id="heroDescription">교육용 영어 지문을 자동으로 생성하고, 품질을 검증하며, 필요시 자동으로 수정하는 <br>MT Further Practice Pipeline 가이드입니다.</p>
+
+                <div class="hero-stats" id="heroStats">
+                    <div class="stat-card">
+                        <span class="stat-number">8</span>
+                        <span class="stat-label">Processing Steps</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number">3</span>
+                        <span class="stat-label">Key Metrics</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number">4</span>
+                        <span class="stat-label">LLM Validations</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="section">
+                <div class="section-header">
+                    <div class="section-title">📚 데이터 범위 & 생성 규모</div>
+                </div>
+                <div class="section-content">
+                    <p class="kpi-period"><strong>기간:</strong> 9월 ~ 현재(1월) 기준</p>
+
+                    <div class="info-grid mt-2">
+                        <div class="info-card">
+                            <div class="info-card-title">📘 대상 교과서</div>
+                            <div class="info-card-content">
+                                <ul class="clean-list">
+                                    <li><strong>Journeys 1-2</strong>: Ready to Roll</li>
+                                    <li><strong>Wonders 1-2</strong>: Fly High</li>
+                                    <li><strong>Wonders 2-2</strong>: Set Sail</li>
+                                    <li><strong>Wonders 2-1</strong>: All Aboard</li>
+                                    <li><strong>Journeys 2-1</strong>: In the Spotlight</li>
+                                    <li><strong>Wonders 3-1</strong>: Into the Horizon</li>
+                                    <li><strong>Journeys 2-2</strong>: Take Action</li>
+                                    <li><strong>Pathfinders 3-2</strong>: Trailblazer</li>
+                                    <li><strong>Pathfinders 3-1</strong>: Pioneer</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="info-card">
+                            <div class="info-card-title">📄 총 원본 지문</div>
+                            <div class="info-card-content">
+                                <div class="kpi-number">56</div>
+                                <div class="kpi-label">교과서에서 기준으로 삼은 원본 지문</div>
+                            </div>
+                        </div>
+
+                        <div class="info-card">
+                            <div class="info-card-title">✅ 검증 지문</div>
+                            <div class="info-card-content">
+                                <div class="kpi-number">1,549</div>
+                                <div class="kpi-label">생성 후 정량/정성 검증 단계에 들어간 후보 지문</div>
+                            </div>
+                        </div>
+
+                        <div class="info-card">
+                            <div class="info-card-title">⭐ 사용 지문</div>
+                            <div class="info-card-content">
+                                <div class="kpi-number">720</div>
+                                <div class="kpi-label">최종 품질 기준을 통과해 실제 사용된 지문</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Pipeline Tabs -->
+            <div class="pipeline-tabs">
+                <button class="tab-btn active" data-tab="passage" onclick="switchPipeline('passage')">
+                    📝 Passage Pipeline
+                </button>
+                <button class="tab-btn" data-tab="question" onclick="switchPipeline('question')">
+                    ❓ Question Pipeline
+                </button>
+            </div>
+
+            <!-- Passage Pipeline Content -->
+            <div id="passage-content" class="tab-content active">
+                <!-- Interactive Flowchart -->
+                <div class="flowchart-container">
+                <div class="flowchart-header">
+                    <div class="flowchart-title">📊 Flow Chart</div>
+                    <div class="flowchart-controls">
+                        <button class="flowchart-btn" onclick="resetZoom()">🔍 Reset Zoom</button>
+                        <button class="flowchart-btn" onclick="centerFlowchart()">🎯 Center</button>
+                    </div>
+                </div>
+                <svg id="flowchart"></svg>
+            </div>
+
+            <!-- Core Metrics Overview -->
+            <section class="section">
+                <div class="section-header">
+                    <div class="section-title">핵심 지표 (Core Metrics)</div>
+                </div>
+                <div class="section-content">
+                    <div class="info-grid">
+                        <div class="info-card">
+                            <div class="info-card-title">📏 AVG_SENTENCE_LENGTH</div>
+                            <div class="info-card-content">
+                                <strong>평균 문장 길이</strong> (단어 수)<br>
+                                예시: 목표 12.3 ± 1.97<br>
+                                → 허용 범위: [10.33 ~ 14.27]
+                            </div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-card-title">🔗 All_Embedded_Clauses_Ratio</div>
+                            <div class="info-card-content">
+                                <strong>내포절 비율</strong> (구문 복잡도)<br>
+                                예시: 목표 0.18 ± 0.202<br>
+                                → 허용 범위: [-0.022 ~ 0.382]
+                            </div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-card-title">📚 CEFR_NVJD_A1A2_lemma_ratio</div>
+                            <div class="info-card-content">
+                                <strong>A1/A2 레벨 어휘 비율</strong><br>
+                                예시: 목표 0.46 ± 0.104<br>
+                                → 허용 범위: [0.356 ~ 0.564]
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info mt-2">
+                        <strong>💡 핵심 관점:</strong> 이 지문 생성 파이프라인은 <strong>정량 지표</strong>(예: 문장 길이·구문 복잡도·CEFR 어휘 비율)로 품질을 1차 검증하고,
+                        동시에 <strong>정성적인 콘텐츠(내용)</strong>까지 함께 고려하여 최종 품질을 보장합니다.
+                    </div>
+
+                    <div class="info-card mt-2">
+                        <div class="info-card-title">🗺️ PassageGen Flow (정량 + 정성 통합)</div>
+                        <div class="info-card-content">
+                            정량 지표 필터링과 정성 검수를 결합한 전체 흐름을 한 장으로 요약한 다이어그램입니다.
+                            <figure class="pipeline-figure">
+                                <a href="TFT%20passageGen_batch2.2%20flow.png" target="_blank" rel="noopener">
+                                    <img src="TFT%20passageGen_batch2.2%20flow.png" alt="TFT passageGen batch2.2 flow diagram" loading="lazy">
+                                </a>
+                                <figcaption>(파일: <code>TFT passageGen_batch3 flow.png</code>)</figcaption>
+                            </figure>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 1: Passage Generator -->
+            <section class="section" id="step-1">
+                <div class="section-header">
+                    <span class="section-number">1</span>
+                    <h2 class="section-title">Passage Generator</h2>
+                    <span class="section-badge badge-generate">생성</span>
+                </div>
+                <div class="section-content">
+                    <div class="subsection">
+                        <h3 class="subsection-title">🎯 역할</h3>
+                        <p>LLM을 사용하여 교육용 영어 지문을 생성합니다.</p>
+                    </div>
+
+                    <div class="subsection">
+                        <h3 class="subsection-title">📥 입력 파라미터</h3>
+                        <ul>
+                            <li>학습자 유형 (learner_type)</li>
+                            <li>목표 읽기 스킬 (target_reading_skill)</li>
+                            <li>단어 수 (word_count)</li>
+                            <li>장르, 톤, 스타일</li>
+                            <li>구문/어휘 난이도 가이드라인 (semantic difficulty, lexical difficulty)</li>
+                            <li>금지 토픽 목록 (topic_prohibition)</li>
+                            <li>원본 교재 지문의 profile (semantic_profile) : MAG, S, GT/MGT 3가지 레벨 마다 profile depth 를 다르게 설정</li>
+                            <li>토픽 유사도 제약 조건</li>
+                        </ul>
+
+                        <div class="param-examples mt-2">
+                            <div class="param-examples-title">📝 예시/설명 (필요한 항목만)</div>
+                            <ul class="param-examples-list">
+                                <li><span class="param-key">learner_type</span> <span class="param-desc">예: <code>1st graders 2nd semester North American elementary students</code></span></li>
+                                <li><span class="param-key">target_reading_skill</span> <span class="param-desc">예: <code>analyzing conflict and solutions</code></span></li>
+                                <li><span class="param-key">word_count</span> <span class="param-desc">예: <code>180</code> (대략 ±10 단어 허용)</span></li>
+                                <li><span class="param-key">topic_prohibition</span> <span class="param-desc">예: 금지 고유명사/토픽 리스트(교재·브랜드·인물명 등)</span></li>
+                                <li><span class="param-key">semantic_profile</span> <span class="param-desc">원본 교재 지문 분석 프로필. 레벨(MAG, S, GT/MGT)마다 depth를 다르게 설정</span></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="subsection">
+                        <h3 class="subsection-title">📤 출력 형식</h3>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">JSON</span>
+                                <button class="copy-btn" onclick="copyCode(this)">📋 Copy</button>
+                            </div>
+                            <div class="code-content">
+                                <pre>{
+  "title": "지문 제목",
+  "passage": "생성된 지문 본문",
+  "topic": "주제 요약 (ProperNoun1, ProperNoun2, ProperNoun3)"
+}</pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="subsection">
+                        <h3 class="subsection-title">🤖 사용 모델</h3>
+                        <div class="info-grid">
+                            <div class="info-card">
+                                <div class="info-card-title">chatgpt-4o-latest</div>
+                                <div class="info-card-content">ChatGPT 앱에서 사용하는 4o용 모델</div>
+                            </div>
+                            <div class="info-card">
+                                <div class="info-card-title">Claude Sonnet 4</div>
+                                <div class="info-card-content">Anthropic</div>
+                            </div>
+                            <div class="info-card">
+                                <div class="info-card-title">Gemini 2.0 Flash</div>
+                                <div class="info-card-content">Google</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <strong>💡 핵심 로직:</strong> 원본 교재의 구문/어휘 난이도를 유사하게 유지하면서 새로운 지문 생성. 금지된 고유명사나 토픽을 피하고 새로운 내용 창작.
+                        ATOS 값을 원본과 +-1로 유지.
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 2: Initial Metrics Filter -->
+            <section class="section" id="step-2">
+                <div class="section-header">
+                    <span class="section-number">2</span>
+                    <h2 class="section-title">Initial Metrics Filter</h2>
+                    <span class="section-badge badge-filter">1차 검수</span>
+                </div>
+                <div class="section-content">
+                    <div class="subsection">
+                        <h3 class="subsection-title">🎯 역할</h3>
+                        <p>ILS Text Analyzer API를 사용하여 생성된 지문의 기본 품질을 정량적으로 검증합니다.</p>
+                    </div>
+
+                    <div class="subsection">
+                        <h3 class="subsection-title">🎯 목적</h3>
+                        <ul>
+                            <li>명백히 부적합한 지문을 조기에 필터링하여 후속 처리 비용 절감</li>
+                            <li>통계적 기준(±1.9σ)으로 객관적인 1차 검수 수행</li>
+                        </ul>
+                    </div>
+
+                    <div class="subsection">
+                        <h3 class="subsection-title">📊 검증 지표 (2개)</h3>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>지표</th>
+                                        <th>설명</th>
+                                        <th>허용 범위</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><strong>AVG_SENTENCE_LENGTH</strong></td>
+                                        <td>평균 문장 길이</td>
+                                        <td>Master ± 1.9σ</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>CEFR_NVJD_A1A2_lemma_ratio</strong></td>
+                                        <td>CEFR A1+A2 어휘 비율</td>
+                                        <td>Master ± 1.9σ</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning">
+                        <strong>⚠️ 참고:</strong> 이 단계는 3가지 지표를 모두 검증하는 "Text Analyzer" 단계와 달리, 2개 지표만 빠르게 검증하여 초기 필터링을
+                        수행합니다.
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 3: Semantic Profile Generator -->
+            <section class="section" id="step-3">
+                <div class="section-header">
+                    <span class="section-number">3</span>
+                    <h2 class="section-title">Semantic Profile Generator</h2>
+                    <span class="section-badge badge-analyze">분석</span>
+                </div>
+                <div class="section-content">
+                    <div class="subsection">
+                        <h3 class="subsection-title">🎯 역할</h3>
+                        <p>생성된 지문의 의미적 특성을 구조화된 프로필로 추출합니다.</p>
+                    </div>
+
+                    <div class="subsection">
+                        <h3 class="subsection-title">📋 2단계 프로세스</h3>
+
+                        <div class="info-card mt-2">
+                            <div class="info-card-title">Phase 1: 기본 프로필 생성</div>
+                            <div class="info-card-content">
+                                <p class="mb-2">LLM(GPT-4.1)을 사용하여 8개 항목 추출</p>
+                            </div>
+                        </div>
+
+                        <div class="info-card mt-2">
+                            <div class="info-card-title">Phase 2: Subtopic_2 생성</div>
+                            <div class="info-card-content">
+                                <p class="mb-2">AR Category 데이터를 참조하여 더 세밀한 하위 주제를 분류 (300+ 옵션)</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="subsection">
+                        <h3 class="subsection-title">📄 프로필 구조 예시</h3>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">JSON - Semantic Profile Example</span>
+                                <button class="copy-btn" onclick="copyCode(this)">📋 Copy</button>
+                            </div>
+                            <div class="code-content">
+                                <pre>{
+  "discipline": "People, Society & Culture",
+  "subtopic_1": "Family Life",
+  "subtopic_2": "Pet Adoption",
+  "central_focus": [
+    "Ellie's request",
+    "choosing a pet",
+    "meeting Bean",
+    "Bean's growth",
+    "play and companionship"
+  ],
+  "key_concepts": [
+    "Ellie", "sister", "brother", "parents",
+    "cat", "dog", "barking", "tail-wagging",
+    "Bean", "floppy ears", "small and sleepy",
+    "soft bed", "leash", "favorite toy", "butterflies"
+  ],
+  "processes_structures": "Ellie's dilemma initiates as a problem: needing a playmate. Dialogue progresses it to a solution: considering a pet. Subsequent search and criteria assessment culminates in finding Bean, with a concluding reflection on growth and companionship.",
+  "setting_context": "The story appears to take place in a modern-day household with a family consisting of children and parents, planning a visit to an animal shelter or similar environment.",
+  "purpose_objective": "entertain",
+  "genre_form": "narrative"
+}</pre>
+                            </div>
+                        </div>
+
+                        <div class="info-grid mt-3">
+                            <div class="info-card">
+                                <div class="info-card-title">🏷️ Discipline & Topics</div>
+                                <div class="info-card-content">
+                                    6개 대분류 → 세부 주제 → 300+ 하위 주제로 계층적 분류
+                                </div>
+                            </div>
+                            <div class="info-card">
+                                <div class="info-card-title">🎯 Central Focus</div>
+                                <div class="info-card-content">
+                                    지문의 주요 섹션이나 단락을 대표하는 핵심 초점 (5개 내외)
+                                </div>
+                            </div>
+                            <div class="info-card">
+                                <div class="info-card-title">🔑 Key Concepts</div>
+                                <div class="info-card-content">
+                                    고유명사, 핵심 용어, 데이터 포인트 등 특징적인 앵커 (15개 내외)
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <strong></strong> <code></code>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 4: Topic Closeness Filter -->
+            <section class="section" id="step-4">
+                <div class="section-header">
+                    <span class="section-number">4</span>
+                    <h2 class="section-title">Topic Closeness Filter</h2>
+                    <span class="section-badge badge-filter">유사도 검사</span>
+                </div>
+                <div class="section-content">
+                    <div class="subsection">
+                        <h3 class="subsection-title">🎯 역할</h3>
+                        <p>생성된 지문이 원본 교재지문과 얼마나 유사한지를 평가합니다.</p>
+                    </div>
+
+                    <div class="subsection">
+                        <h3 class="subsection-title">� 비교 프로세스</h3>
+                        <p class="mb-2" style="color: var(--text-secondary);">원본 교재의 Semantic Profile과 생성된 지문의 Semantic
+                            Profile을 LLM이 비교하여 유사도를 점수화합니다.</p>
+
+                        <!-- Comparison Visualization -->
+                        <div
+                            style="background: var(--bg-primary); padding: 2rem; border-radius: 8px; margin: 1.5rem 0;">
+                            <div
+                                style="display: flex; align-items: center; justify-content: space-between; gap: 2rem; flex-wrap: wrap;">
+                                <!-- Original Profile -->
+                                <div style="flex: 1; min-width: 280px;">
+                                    <div
+                                        style="background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%); padding: 1.5rem; border-radius: 12px; border: 2px solid #2196F3; box-shadow: 0 4px 12px rgba(33, 150, 243, 0.2);">
+                                        <div
+                                            style="font-weight: 700; color: #1565C0; margin-bottom: 1rem; font-size: 1.1rem; text-align: center;">
+                                            📚 Original Profile</div>
+                                        <div
+                                            style="background: white; padding: 1rem; border-radius: 8px; font-size: 0.85rem; color: #424242;">
+                                            <div style="margin-bottom: 0.5rem;"><strong>Discipline:</strong> Science
+                                            </div>
+                                            <div style="margin-bottom: 0.5rem;"><strong>Subtopic_1:</strong> Animals
+                                            </div>
+                                            <div style="margin-bottom: 0.5rem;"><strong>Subtopic_2:</strong> Marine Life
+                                            </div>
+                                            <div style="margin-bottom: 0.5rem;"><strong>Central Focus:</strong> ocean,
+                                                dolphins, communication...</div>
+                                            <div style="margin-bottom: 0.5rem;"><strong>Key Concepts:</strong>
+                                                echolocation, pods, intelligence...</div>
+                                            <div><strong>Genre:</strong> expository</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Comparison Arrow -->
+                                <div style="text-align: center; min-width: 100px;">
+                                    <div style="font-size: 2rem; color: var(--primary); margin-bottom: 0.5rem;">⚖️</div>
+                                    <div style="font-size: 0.9rem; font-weight: 600; color: var(--text-secondary);">
+                                        LLM<br />Comparison</div>
+                                    <div
+                                        style="margin-top: 0.5rem; padding: 0.5rem 1rem; background: var(--bg-tertiary); border-radius: 20px; font-size: 0.85rem; font-weight: 600;">
+                                        8개 항목 평가</div>
+                                </div>
+
+                                <!-- Generated Profile -->
+                                <div style="flex: 1; min-width: 280px;">
+                                    <div
+                                        style="background: linear-gradient(135deg, #F3E5F5 0%, #E1BEE7 100%); padding: 1.5rem; border-radius: 12px; border: 2px solid #9C27B0; box-shadow: 0 4px 12px rgba(156, 39, 176, 0.2);">
+                                        <div
+                                            style="font-weight: 700; color: #7B1FA2; margin-bottom: 1rem; font-size: 1.1rem; text-align: center;">
+                                            ✨ Generated Profile</div>
+                                        <div
+                                            style="background: white; padding: 1rem; border-radius: 8px; font-size: 0.85rem; color: #424242;">
+                                            <div style="margin-bottom: 0.5rem;"><strong>Discipline:</strong> Science
+                                            </div>
+                                            <div style="margin-bottom: 0.5rem;"><strong>Subtopic_1:</strong> Animals
+                                            </div>
+                                            <div style="margin-bottom: 0.5rem;"><strong>Subtopic_2:</strong> Whales
+                                            </div>
+                                            <div style="margin-bottom: 0.5rem;"><strong>Central Focus:</strong> ocean,
+                                                whales, migration...</div>
+                                            <div style="margin-bottom: 0.5rem;"><strong>Key Concepts:</strong> baleen,
+                                                krill, songs...</div>
+                                            <div><strong>Genre:</strong> expository</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Scoring Result -->
+                            <div style="margin-top: 2rem; text-align: center;">
+                                <div
+                                    style="display: inline-block; background: linear-gradient(135deg, #C8E6C9 0%, #A5D6A7 100%); padding: 1.5rem 3rem; border-radius: 12px; border: 2px solid #4CAF50; box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);">
+                                    <div style="font-size: 0.9rem; color: #2E7D32; margin-bottom: 0.5rem;">Total Points
+                                    </div>
+                                    <div
+                                        style="font-size: 2.5rem; font-weight: 700; color: #1B5E20; margin-bottom: 0.5rem;">
+                                        8</div>
+                                    <div style="font-size: 1.2rem; font-weight: 600; color: #2E7D32;">Closeness Label:
+                                        <span style="font-size: 1.5rem;">3</span>
+                                    </div>
+                                    <div
+                                        style="margin-top: 0.5rem; padding: 0.5rem 1rem; background: rgba(255,255,255,0.8); border-radius: 20px; font-size: 0.85rem; color: #1B5E20;">
+                                        ✅ 적절한 유사도 (MAG)</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Evaluation Criteria -->
+                        <div class="info-grid mt-3">
+                            <div class="info-card">
+                                <div class="info-card-title">📊 8개 평가 항목</div>
+                                <div class="info-card-content" style="font-size: 0.85rem;">
+                                    1. discipline_match<br>
+                                    2. subtopic_match<br>
+                                    3. central_focus_match<br>
+                                    4. key_concept_overlap<br>
+                                    5. process_parallel<br>
+                                    6. setting_alignment<br>
+                                    7. purpose_alignment<br>
+                                    8. genre_alignment
+                                </div>
+                            </div>
+                            <div class="info-card">
+                                <div class="info-card-title">🎯 점수 계산</div>
+                                <div class="info-card-content">
+                                    각 항목별 점수 합산 + penalties<br>
+                                    → Total Points 산출<br>
+                                    → Closeness Label (1~5) 매핑
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="subsection">
+                        <h3 class="subsection-title">�📊 Closeness Label 매핑</h3>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Total Points</th>
+                                        <th>Label</th>
+                                        <th>의미</th>
+                                        <th>판정</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>13+</td>
+                                        <td>5</td>
+                                        <td>아주 유사함</td>
+                                        <td style="color: var(--danger);">GT</td>
+                                    </tr>
+                                    <tr style="background: var(--status-success); color: white;">
+                                        <td>7~9</td>
+                                        <td>3</td>
+                                        <td>적절한 유사도</td>
+                                        <td>MAG</td>
+                                    </tr>
+                                    <tr>
+                                        <td>0~3</td>
+                                        <td>1</td>
+                                        <td>거의 다름</td>
+                                        <td style="color: var(--danger);">❌</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 5: Validation Chain -->
+            <section class="section" id="step-5">
+                <div class="section-header">
+                    <span class="section-number">5</span>
+                    <h2 class="section-title">Validation Chain</h2>
+                    <span class="section-badge badge-filter">4단계 검증</span>
+                </div>
+                <div class="section-content">
+                    <div class="subsection">
+                        <h3 class="subsection-title">🎯 역할</h3>
+                        <p>4단계의 순차적 LLM 호출을 통해 지문을 다각도로 검증하고 수정합니다. Human validation을 대체하기 위한 목적입니다.</p>
+                    </div>
+
+                    <div class="subsection">
+                        <h3 class="subsection-title">🔗 순차적 4단계 검증 프로세스</h3>
+                        <p class="mb-2" style="color: var(--text-secondary);">각 LLM 호출의 출력이 다음 LLM 호출의 입력이 되는 <strong>체인
+                                구조</strong>입니다.</p>
+
+                        <!-- Sequential Flow Visualization -->
+                        <div
+                            style="background: var(--bg-primary); padding: 2rem; border-radius: 8px; margin: 1.5rem 0;">
+                            <div
+                                style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                                <div style="flex: 1; min-width: 150px; text-align: center;">
+                                    <div
+                                        style="background: #E3F2FD; padding: 1rem; border-radius: 8px; border: 2px solid #2196F3;">
+                                        <div style="font-weight: 600; color: #1565C0; margin-bottom: 0.5rem;">📝 Input
+                                        </div>
+                                        <div style="font-size: 0.85rem; color: #424242;">생성된 지문</div>
+                                    </div>
+                                </div>
+                                <div style="font-size: 1.5rem; color: var(--text-secondary);">→</div>
+                                <div style="flex: 1; min-width: 150px; text-align: center;">
+                                    <div style="background: #E3F2FD; padding: 1rem; border-radius: 8px;">
+                                        <div style="font-weight: 600; color: #1565C0; margin-bottom: 0.5rem;">LLM Call 1
+                                        </div>
+                                        <div style="font-size: 0.85rem; color: #424242;">Genre Mismatch</div>
+                                        <div style="font-size: 0.75rem; color: #666; margin-top: 0.25rem;">
+                                            OUTPUT_PASSAGE_1</div>
+                                    </div>
+                                </div>
+                                <div style="font-size: 1.5rem; color: var(--text-secondary);">→</div>
+                                <div style="flex: 1; min-width: 150px; text-align: center;">
+                                    <div style="background: #F3E5F5; padding: 1rem; border-radius: 8px;">
+                                        <div style="font-weight: 600; color: #7B1FA2; margin-bottom: 0.5rem;">LLM Call 2
+                                        </div>
+                                        <div style="font-size: 0.85rem; color: #424242;">Awkward Content</div>
+                                        <div style="font-size: 0.75rem; color: #666; margin-top: 0.25rem;">
+                                            OUTPUT_PASSAGE_2</div>
+                                    </div>
+                                </div>
+                                <div style="font-size: 1.5rem; color: var(--text-secondary);">→</div>
+                                <div style="flex: 1; min-width: 150px; text-align: center;">
+                                    <div style="background: #E8F5E9; padding: 1rem; border-radius: 8px;">
+                                        <div style="font-weight: 600; color: #2E7D32; margin-bottom: 0.5rem;">LLM Call 3
+                                        </div>
+                                        <div style="font-size: 0.85rem; color: #424242;">Grammar Errors</div>
+                                        <div style="font-size: 0.75rem; color: #666; margin-top: 0.25rem;">
+                                            OUTPUT_PASSAGE_3</div>
+                                    </div>
+                                </div>
+                                <div style="font-size: 1.5rem; color: var(--text-secondary);">→</div>
+                                <div style="flex: 1; min-width: 150px; text-align: center;">
+                                    <div style="background: #FFF3E0; padding: 1rem; border-radius: 8px;">
+                                        <div style="font-weight: 600; color: #E65100; margin-bottom: 0.5rem;">LLM Call 4
+                                        </div>
+                                        <div style="font-size: 0.85rem; color: #424242;">Factual Check</div>
+                                        <div style="font-size: 0.75rem; color: #666; margin-top: 0.25rem;">
+                                            OUTPUT_PASSAGE_4</div>
+                                    </div>
+                                </div>
+                                <div style="font-size: 1.5rem; color: var(--text-secondary);">→</div>
+                                <div style="flex: 1; min-width: 150px; text-align: center;">
+                                    <div
+                                        style="background: #C8E6C9; padding: 1rem; border-radius: 8px; border: 2px solid #4CAF50;">
+                                        <div style="font-weight: 600; color: #2E7D32; margin-bottom: 0.5rem;">✅ Output
+                                        </div>
+                                        <div style="font-size: 0.85rem; color: #424242;">검증된 지문</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="info-grid">
+                            <div class="info-card" style="background: #E3F2FD;">
+                                <div class="info-card-title">1️⃣ Genre Mismatch</div>
+                                <div class="info-card-content">
+                                    <strong>검증 항목:</strong> 장르와 내용 일치 확인<br>
+                                    <strong>예시:</strong> Expository 지문인데 narrative 요소 과다
+                                </div>
+                            </div>
+                            <div class="info-card" style="background: #F3E5F5;">
+                                <div class="info-card-title">2️⃣ Awkward/Unnatural Content</div>
+                                <div class="info-card-content">
+                                    <strong>검증 항목:</strong> 부자연스러운 표현 수정<br>
+                                    <strong>예시:</strong> 갑작스러운 주제 전환, 논리 흐름 단절
+                                </div>
+                            </div>
+                            <div class="info-card" style="background: #E8F5E9;">
+                                <div class="info-card-title">3️⃣ Typos/Grammar Errors</div>
+                                <div class="info-card-content">
+                                    <strong>검증 항목:</strong> 오타/문법 교정<br>
+                                    <strong>예시:</strong> 주어-동사 불일치, 시제 오류, 관사 오용
+                                </div>
+                            </div>
+                            <div class="info-card" style="background: #FFF3E0;">
+                                <div class="info-card-title">4️⃣ Logical/Factual Inaccuracy</div>
+                                <div class="info-card-content">
+                                    <strong>검증 항목:</strong> 논리/사실 검증<br>
+                                    <strong>예시:</strong> 과학적 오류, 역사적 부정확성, 논리적 모순
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <strong>📤 출력 형식:</strong> 각 LLM 호출은 <code>{OUTPUT_TITLE}, {OUTPUT_PASSAGE}</code> 로 출력하며,
+                        G-sheet에 각 단계별 결과를 저장하여 변화 추적이 가능합니다.
+                    </div>
+
+                    <div class="alert alert-warning">
+                        <strong>⚠️ 구현 상태:</strong> 현재 설계・테스트 단계이며, ATLAS에서 배치 실행 후 결과를 제공합니다. 향후 재구성 예정입니다.
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 6: Text Analyzer -->
+            <section class="section" id="step-6">
+                <div class="section-header">
+                    <span class="section-number">6</span>
+                    <h2 class="section-title">Text Analyzer</h2>
+                    <span class="section-badge badge-analyze">3지표 분석</span>
+                </div>
+                <div class="section-content">
+                    <div class="subsection">
+                        <h3 class="subsection-title">🎯 역할</h3>
+                        <p>외부 ILS Text Analyzer API를 호출하여 지문의 구문/어휘 지표를 정량적으로 분석합니다.</p>
+                    </div>
+
+                    <div class="subsection">
+                        <h3 class="subsection-title">🎯 목적</h3>
+                        <ul>
+                            <li>3가지 핵심 지표를 정밀하게 측정하여 품질 검증</li>
+                            <li>마스터 기준과 비교하여 Pass/Fail 판단 및 Case 분류</li>
+                            <li>구문/어휘 수정이 필요한지 결정하는 핵심 단계</li>
+                        </ul>
+                    </div>
+
+                    <div class="subsection">
+                        <h3 class="subsection-title">📊 검증 지표 (3개)</h3>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>지표</th>
+                                        <th>설명</th>
+                                        <th>허용 범위</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><strong>AVG_SENTENCE_LENGTH</strong></td>
+                                        <td>평균 문장 길이 (단어 수)</td>
+                                        <td>Master ± tolerance_abs</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>All_Embedded_Clauses_Ratio</strong></td>
+                                        <td>내포절 비율 (구문 복잡도)</td>
+                                        <td>Master ± tolerance_ratio</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>CEFR_NVJD_A1A2_lemma_ratio</strong></td>
+                                        <td>CEFR A1+A2 레벨 어휘 비율</td>
+                                        <td>Master ± tolerance_ratio</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="subsection">
+                        <h3 class="subsection-title">🔀 3가지 Case 분류</h3>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Case</th>
+                                        <th>구문</th>
+                                        <th>어휘</th>
+                                        <th>다음 단계</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><strong>Case A</strong></td>
+                                        <td style="color: var(--success);">✅ PASS</td>
+                                        <td style="color: var(--success);">✅ PASS</td>
+                                        <td style="background: var(--status-success); color: white;">즉시 Final</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Case B</strong></td>
+                                        <td style="color: var(--success);">✅ PASS</td>
+                                        <td style="color: var(--danger);">❌ FAIL</td>
+                                        <td>어휘 수정 모듈</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Case C</strong></td>
+                                        <td style="color: var(--danger);">❌ FAIL</td>
+                                        <td>-</td>
+                                        <td>구문 수정 모듈</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 7: Syntax Revision -->
+            <section class="section" id="step-7">
+                <div class="section-header">
+                    <span class="section-number">7</span>
+                    <h2 class="section-title">Syntax Revision Module</h2>
+                    <span class="section-badge badge-revise">구문 수정</span>
+                </div>
+                <div class="section-content">
+                    <div class="subsection">
+                        <h3 class="subsection-title">🎯 역할</h3>
+                        <p>구문 지표가 목표 범위를 벗어난 경우, LLM을 사용하여 문장 구조를 수정합니다.</p>
+                    </div>
+
+                    <div class="subsection">
+                        <h3 class="subsection-title">🤖 LLM 전략</h3>
+                        <div class="info-grid">
+                            <div class="info-card">
+                                <div class="info-card-title">Temperature [0.2, 0.3]</div>
+                                <div class="info-card-content">각 temperature별 2개 = 총 4개 후보 생성</div>
+                            </div>
+                            <div class="info-card">
+                                <div class="info-card-title">순차 분석</div>
+                                <div class="info-card-content">첫 번째 통과한 후보 선택</div>
+                            </div>
+                            <div class="info-card">
+                                <div class="info-card-title">완전 자동화</div>
+                                <div class="info-card-content">사람 개입 불필요</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-success">
+                        <strong>✅ 자동화:</strong> 구문 수정은 완전히 자동화되어 있으며, 사람의 개입이 필요하지 않습니다.
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 8: Lexical Revision -->
+            <section class="section" id="step-8">
+                <div class="section-header">
+                    <span class="section-number">8</span>
+                    <h2 class="section-title">Lexical Revision Module</h2>
+                    <span class="section-badge badge-revise">어휘 수정</span>
+                </div>
+                <div class="section-content">
+                    <div class="subsection">
+                        <h3 class="subsection-title">🎯 역할</h3>
+                        <p>어휘 지표가 목표 범위를 벗어난 경우, 문장별로 어휘를 수정합니다.</p>
+                    </div>
+
+                    <div class="subsection">
+                        <h3 class="subsection-title">🤖 LLM 호출 전략</h3>
+                        <div class="info-grid">
+                            <div class="info-card">
+                                <div class="info-card-title">3회 호출</div>
+                                <div class="info-card-content">각 호출마다 문장별로 3개 수정안<br>최대 9개 어휘 대안</div>
+                            </div>
+                            <div class="info-card">
+                                <div class="info-card-title">Temperature 0.2</div>
+                                <div class="info-card-content">일관성 중시</div>
+                            </div>
+                            <div class="info-card">
+                                <div class="info-card-title">중복 제거</div>
+                                <div class="info-card-content">자동 중복 제거</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning">
+                        <strong>👤 사람의 개입:</strong> 어휘 수정은 <strong>사람이 최종 선택</strong>합니다.
+                    </div>
+                </div>
+            </section>
+
+            <!-- Troubleshooting -->
+            <section class="section" id="troubleshooting">
+                <div class="section-header">
+                    <h2 class="section-title">🔧 Troubleshooting Guide</h2>
+                </div>
+                <!-- <div class="section-content">
+                    <div class="subsection">
+                        <h3 class="subsection-title">구문 수정이 계속 실패하는 경우</h3>
+                        <div class="alert alert-danger">
+                            <strong>원인:</strong> Tolerance 범위가 너무 좁음, LLM 후보 모두 범위 밖
+                        </div>
+                        <div class="alert alert-success">
+                            <strong>해결책:</strong> Tolerance 값 조정, 다른 LLM 모델 시도
+                        </div>
+                    </div>
+
+                    <div class="subsection">
+                        <h3 class="subsection-title">API 타임아웃 발생</h3>
+                        <div class="alert alert-success">
+                            <strong>해결책:</strong> PIPELINE_TIMEOUT 값 증가 (기본 300초), 배치 크기 줄이기
+                        </div>
+                    </div>
+                </div> -->
+            </section>
+
+            <!-- Glossary -->
+            <section class="section" id="glossary">
+                <div class="section-header">
+                    <h2 class="section-title">📖 용어 설명</h2>
+                </div>
+                <div class="section-content">
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>용어</th>
+                                    <th>설명</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>Embedded Clauses</strong></td>
+                                    <td>문장 내에 포함된 종속절</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>CEFR</strong></td>
+                                    <td>유럽 언어 공통 참조 기준 (A1/A2: 초급, B1/B2: 중급, C1/C2: 고급)</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Temperature</strong></td>
+                                    <td>LLM 생성 시 창의성/일관성 조절 (0.2: 일관성 ↔ 1.0: 창의성)</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+            </div>
+            <!-- End Passage Pipeline Content -->
+
+            <!-- Question Pipeline Content -->
+            <div id="question-content" class="tab-content question-pipeline">
+                <!-- Interactive Flowchart -->
+                <div class="flowchart-container">
+                    <div class="flowchart-header">
+                        <div class="flowchart-title">📊 Flow Chart</div>
+                        <div class="flowchart-controls">
+                            <button class="flowchart-btn" onclick="resetQuestionZoom()">🔍 Reset Zoom</button>
+                            <button class="flowchart-btn" onclick="centerQuestionFlowchart()">🎯 Center</button>
+                        </div>
+                    </div>
+                    <svg id="question-flowchart"></svg>
+                </div>
+
+                <!-- Step 1: Question Generator -->
+                <section class="section" id="q-step-1">
+                    <div class="section-header">
+                        <span class="section-number">1</span>
+                        <h2 class="section-title">Question Generator</h2>
+                        <span class="section-badge badge-generate">문항 생성</span>
+                    </div>
+                    <div class="section-content">
+                        <div class="subsection">
+                            <h3 class="subsection-title">🎯 역할</h3>
+                            <p>주어진 지문(passage)을 기반으로 객관식 독해 문제(MCQ)를 생성합니다.</p>
+                        </div>
+
+                        <div class="subsection">
+                            <h3 class="subsection-title">📥 입력 파라미터</h3>
+                            <ul>
+                                <li>학습자 유형 (var_learner_type) </li>
+                                <li>문항 형태 (var_question_form: positive/negative)</li>
+                                <li>생성할 문항 수 (var_question_number)</li>
+                                <li>장르 (var_broad_genre)</li>
+                                <li>목표 읽기 스킬 (var_target_reading_skill)</li>
+                                <li>읽기 스킬 설명 (var_reading_skill_explanation_stem)</li>
+                                <li>읽기 스킬 개요 (var_reading_skill_overview)</li>
+                                <li>MCQ 생성 기준 (var_mcq_generation_criteria)</li>
+                                <li>지문 (var_passage)</li>
+                                <li>난이도 (var_difficulty)</li>
+                                <li>원본 문항 (var_original_question)</li>
+                            </ul>
+                        </div>
+
+                        <div class="subsection">
+                            <h3 class="subsection-title">📤 출력 형식</h3>
+                            <div class="code-block">
+                                <div class="code-header">
+                                    <span class="code-language">JSON Array</span>
+                                    <button class="copy-btn" onclick="copyCode(this)">📋 Copy</button>
+                                </div>
+                                <div class="code-content">
+                                    <pre>[
+  {
+    "question_number": 1,
+    "stem": "문항 질문 텍스트",
+    "options": {
+      "A": "선택지 A",
+      "B": "선택지 B",
+      "C": "선택지 C",
+      "D": "선택지 D"
+    },
+    "key": "B",
+    "explanation": "정답 설명"
+  }
+]</pre>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="subsection">
+                            <h3 class="subsection-title">🤖 사용 모델</h3>
+                            <div class="info-card">
+                                <div class="info-card-title">chatgpt-4o-latest</div>
+                                <div class="info-card-content">ChatGPT 앱에서 사용하는 4o 모델</div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <strong>💡 핵심 로직:</strong> Common Core State Standards에 맞춰 특정 읽기 스킬을 평가하는 문항 생성.
+                            문항 형태(positive/negative)에 따라 질문 구조 조정. 정답(key)의 위치를 무작위로 배치하여 패턴 방지.
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Step 2: Meta Labeling -->
+                <section class="section" id="q-step-2">
+                    <div class="section-header">
+                        <span class="section-number">2</span>
+                        <h2 class="section-title">Meta Labeling</h2>
+                        <span class="section-badge badge-analyze">메타 분석</span>
+                    </div>
+                    <div class="section-content">
+                        <div class="subsection">
+                            <h3 class="subsection-title">🎯 역할</h3>
+                            <p>생성된 문항의 구조적·언어적 특성을 3가지 관점에서 분석하고 분류합니다.</p>
+                        </div>
+
+                        <div class="subsection">
+                            <h3 class="subsection-title">📊 3가지 분석 유형</h3>
+                            <div class="info-grid">
+                                <div class="info-card">
+                                    <div class="info-card-title">2a. Stem Analysis</div>
+                                    <div class="info-card-content">
+                                        문항 질문의 구문 구조 분석
+                                    </div>
+                                </div>
+                                <div class="info-card">
+                                    <div class="info-card-title">2b. Options Structure</div>
+                                    <div class="info-card-content">
+                                        선택지의 문법적 구조 분석
+                                    </div>
+                                </div>
+                                <div class="info-card">
+                                    <div class="info-card-title">2c. Options Language</div>
+                                    <div class="info-card-content">
+                                        선택지와 지문의 언어적 관계 분석
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="subsection">
+                            <h3 class="subsection-title">🤖 사용 모델</h3>
+                            <div class="info-card">
+                                <div class="info-card-title">gpt-4.1</div>
+                                <div class="info-card-content">정밀한 구조 분석을 위한 모델</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Step 2a: Stem Analysis -->
+                <section class="section" id="q-step-2a">
+                    <div class="section-header">
+                        <span class="section-number">2a</span>
+                        <h2 class="section-title">Stem Analysis</h2>
+                        <span class="section-badge badge-analyze">질문 구조</span>
+                    </div>
+                    <div class="section-content">
+                        <div class="subsection">
+                            <h3 class="subsection-title">🎯 역할</h3>
+                            <p>문항의 질문(stem) 텍스트를 분석하여 주어-동사(S-V) 쌍을 카운트하고 4가지 카테고리로 분류합니다.</p>
+                        </div>
+
+                        <div class="subsection">
+                            <h3 class="subsection-title">📋 분류 카테고리</h3>
+                            <div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>카테고리</th>
+                                            <th>조건</th>
+                                            <th>예시</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><strong>Phrase</strong></td>
+                                            <td>0개 S-V 쌍 또는 필수 요소 빈칸</td>
+                                            <td>"The author thinks that Jane's work ____."</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Simple Sentence</strong></td>
+                                            <td>1개 완전한 S-V, 빈칸 없음</td>
+                                            <td>"Dogs bark loudly."</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Complex Sentence</strong></td>
+                                            <td>2개 이상 완전한 S-V, 빈칸 없음</td>
+                                            <td>"Which option shows what dogs do?"</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Excerpt</strong></td>
+                                            <td>인용문 + 별도 질문</td>
+                                            <td>인용 + 질문 조합</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="subsection">
+                            <h3 class="subsection-title">📤 출력 형식</h3>
+                            <div class="code-block">
+                                <div class="code-header">
+                                    <span class="code-language">JSON</span>
+                                    <button class="copy-btn" onclick="copyCode(this)">📋 Copy</button>
+                                </div>
+                                <div class="code-content">
+                                    <pre>{
+  "stem": "입력된 질문 텍스트",
+  "Stem_COT": "분석 과정 설명",
+  "classification": "Phrase|Simple Sentence|Complex Sentence|Excerpt"
+}</pre>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <strong>💡 핵심 규칙:</strong> 빈칸이 필수 문법 요소를 채우는 경우 항상 Phrase로 분류.
+                            숨겨진 관계절(that/which/who 생략)도 S-V 쌍으로 카운트.
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Step 2b: Options Structure -->
+                <section class="section" id="q-step-2b">
+                    <div class="section-header">
+                        <span class="section-number">2b</span>
+                        <h2 class="section-title">Options Structure</h2>
+                        <span class="section-badge badge-analyze">선택지 구조</span>
+                    </div>
+                    <div class="section-content">
+                        <div class="subsection">
+                            <h3 class="subsection-title">🎯 역할</h3>
+                            <p>각 선택지(A, B, C, D)의 문법적 구조를 분석합니다. Stem 내 존재 여부에 따라 다른 분석 경로를 적용합니다.</p>
+                        </div>
+
+                        <div class="subsection">
+                            <h3 class="subsection-title">🔀 2단계 분석 프로세스</h3>
+                            <div class="info-grid">
+                                <div class="info-card">
+                                    <div class="info-card-title">Path A: Contextual Analysis</div>
+                                    <div class="info-card-content">
+                                        선택지가 Stem 내에 존재하는 경우<br>
+                                        → Stem 내에서의 문법적 역할 분석
+                                    </div>
+                                </div>
+                                <div class="info-card">
+                                    <div class="info-card-title">Path B: Independent Analysis</div>
+                                    <div class="info-card-content">
+                                        선택지가 Stem 내에 없는 경우<br>
+                                        → 독립적인 구조로 분석
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="subsection">
+                            <h3 class="subsection-title">📋 분류 카테고리</h3>
+                            <div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>카테고리</th>
+                                            <th>조건</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><strong>Word</strong></td>
+                                            <td>단일 어휘 단위 (복합명사 포함)</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Phrase</strong></td>
+                                            <td>완전한 S-V 구조 없음 또는 문장 종결 구두점 없음</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Simple Sentence</strong></td>
+                                            <td>1개 독립절, 0개 종속절 + 문장 종결 구두점</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Compound Sentence</strong></td>
+                                            <td>2개 이상 독립절, 0개 종속절 + 문장 종결 구두점</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Complex Sentence</strong></td>
+                                            <td>최소 1개 독립절 + 1개 종속절 + 문장 종결 구두점</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-warning">
+                            <strong>⚠️ 구두점 우선 규칙:</strong> 문장 종결 구두점(. ? ! ;)이 없으면 Simple/Compound/Complex로 분류 불가.
+                            완전한 S-V 구조가 있어도 구두점이 없으면 Phrase로 분류됩니다.
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Step 2c: Options Language -->
+                <section class="section" id="q-step-2c">
+                    <div class="section-header">
+                        <span class="section-number">2c</span>
+                        <h2 class="section-title">Options Language</h2>
+                        <span class="section-badge badge-analyze">언어 관계</span>
+                    </div>
+                    <div class="section-content">
+                        <div class="subsection">
+                            <h3 class="subsection-title">🎯 역할</h3>
+                            <p>각 선택지와 원본 지문(passage)의 언어적 관계를 분석하여 5가지 카테고리로 분류합니다.</p>
+                        </div>
+
+                        <div class="subsection">
+                            <h3 class="subsection-title">🔍 분석 프로세스 (우선순위)</h3>
+                            <ol>
+                                <li>문항(Question)의 맥락을 고려하여 분류 경계 파악</li>
+                                <li>100% 동일 여부 확인 → Fully Verbatim</li>
+                                <li>지문에 없는 내용 확인 → Content Not Found In Passage</li>
+                                <li>추론 vs 재표현 판단 (문항 맥락 고려)</li>
+                                <li>동의어 치환 여부 → Synonym Substitution</li>
+                                <li>기본 재표현 → Simple Rephrasing</li>
+                            </ol>
+                        </div>
+
+                        <div class="subsection">
+                            <h3 class="subsection-title">📋 분류 카테고리</h3>
+                            <div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>카테고리</th>
+                                            <th>설명</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><strong>Fully Verbatim</strong></td>
+                                            <td>지문과 100% 동일한 표현 (구두점 포함)</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Simple Rephrasing</strong></td>
+                                            <td>소폭 문법·구조 변경, 동일 어휘·의미 유지</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Synonym Substitution</strong></td>
+                                            <td>동의어 치환, 문장 구조는 동일</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Inferential Paraphrasing</strong></td>
+                                            <td>논리적 추론 필요, 여러 정보 종합 또는 목적·의미 해석</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Content Not Found In Passage</strong></td>
+                                            <td>지문에 없거나 모순되는 내용</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="subsection">
+                            <h3 class="subsection-title">📤 출력 형식</h3>
+                            <div class="code-block">
+                                <div class="code-header">
+                                    <span class="code-language">JSON</span>
+                                    <button class="copy-btn" onclick="copyCode(this)">📋 Copy</button>
+                                </div>
+                                <div class="code-content">
+                                    <pre>{
+  "option_A_text": "선택지 A 텍스트",
+  "option_A_language": "분류 카테고리",
+  "option_B_text": "선택지 B 텍스트",
+  "option_B_language": "분류 카테고리",
+  "option_C_text": "선택지 C 텍스트",
+  "option_C_language": "분류 카테고리",
+  "option_D_text": "선택지 D 텍스트",
+  "option_D_language": "분류 카테고리"
+}</pre>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <strong>💡 문항 맥락 고려:</strong> 문항이 문자 이해(literal comprehension)를 테스트하면 Simple Rephrasing 많음.
+                            추론(inference)을 테스트하면 Inferential Paraphrasing 많음. 문항의 의도를 파악하여 분류 경계를 조정합니다.
+                        </div>
+                    </div>
+                </section>
+            </div>
+            <!-- End Question Pipeline Content -->
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>TFT Pipeline - Interactive Documentation (Passage & Question)</p>
+            <p style="font-size: 0.9rem; margin-top: 0.5rem;">
+                문서 버전: 2.0 | 최종 수정일: 2026-01-27
+            </p>
+        </footer>
+    </main>
+
+    <script>
+        // ============================================
+        // D3.js Flowchart Implementation
+        // ============================================
+        const flowchartData = {
+            nodes: [
+                { id: 'start', label: 'Start', subtitle: '지문 생성 요청', type: 'start', x: 400, y: 50 },
+                { id: 'step-1', label: '1. Generator', subtitle: 'LLM 지문 생성', type: 'process', x: 400, y: 150, section: 'step-1' },
+                { id: 'step-2', label: '2. Initial Filter', subtitle: '±1.9σ 검증', type: 'filter', x: 400, y: 250, section: 'step-2' },
+                { id: 'discard-1', label: 'Discard', subtitle: '초기 필터 실패', type: 'fail', x: 150, y: 250 },
+                { id: 'step-3', label: '3. Semantic Profile', subtitle: '의미 프로필 추출', type: 'process', x: 400, y: 350, section: 'step-3' },
+                { id: 'step-4', label: '4. Topic Closeness', subtitle: '유사도 1~5', type: 'filter', x: 400, y: 450, section: 'step-4' },
+                { id: 'discard-2', label: 'Discard', subtitle: '유사도 부적절', type: 'fail', x: 150, y: 450 },
+                { id: 'step-5', label: '5. Validation Chain', subtitle: '4단계 LLM 검증', type: 'process', x: 400, y: 550, section: 'step-5' },
+                { id: 'discard-3', label: 'Discard', subtitle: '검증 실패', type: 'fail', x: 150, y: 550 },
+                { id: 'step-6', label: '6. Text Analyzer', subtitle: '3지표 분석', type: 'process', x: 400, y: 650, section: 'step-6' },
+                { id: 'decision', label: 'Case 분류', subtitle: 'A/B/C', type: 'decision', x: 400, y: 750 },
+                { id: 'final-1', label: 'Final', subtitle: 'Case A: 모두 통과', type: 'success', x: 650, y: 750 },
+                { id: 'step-7', label: '7. Syntax Fix', subtitle: '구문 수정', type: 'revise', x: 400, y: 850, section: 'step-7' },
+                { id: 'discard-4', label: 'Discard', subtitle: '구문 수정 실패', type: 'fail', x: 150, y: 850 },
+                { id: 'step-8', label: '8. Lexical Fix', subtitle: '어휘 수정', type: 'revise', x: 400, y: 950, section: 'step-8' },
+                { id: 'final-2', label: 'Final', subtitle: '성공', type: 'success', x: 650, y: 950 },
+                { id: 'discard-5', label: 'Discard', subtitle: '어휘 수정 실패', type: 'fail', x: 150, y: 950 }
+            ],
+            links: [
+                { source: 'start', target: 'step-1' },
+                { source: 'step-1', target: 'step-2' },
+                { source: 'step-2', target: 'step-3', label: 'Pass' },
+                { source: 'step-2', target: 'discard-1', label: 'Fail' },
+                { source: 'step-3', target: 'step-4' },
+                { source: 'step-4', target: 'step-5', label: 'Label 3' },
+                { source: 'step-4', target: 'discard-2', label: 'Label 1/5' },
+                { source: 'step-5', target: 'step-6', label: 'Pass' },
+                { source: 'step-5', target: 'discard-3', label: 'Fail' },
+                { source: 'step-6', target: 'decision' },
+                { source: 'decision', target: 'final-1', label: 'Case A' },
+                { source: 'decision', target: 'step-7', label: 'Case C' },
+                { source: 'decision', target: 'step-8', label: 'Case B' },
+                { source: 'step-7', target: 'step-8', label: 'Pass' },
+                { source: 'step-7', target: 'discard-4', label: 'Fail' },
+                { source: 'step-8', target: 'final-2', label: 'Pass' },
+                { source: 'step-8', target: 'discard-5', label: 'Fail' }
+            ]
+        };
+
+        const svg = d3.select('#flowchart');
+        const width = svg.node().getBoundingClientRect().width;
+        const height = 600;
+
+        svg.attr('width', width).attr('height', height);
+
+        // Create zoom behavior
+        const zoom = d3.zoom()
+            .scaleExtent([0.5, 2])
+            .on('zoom', (event) => {
+                g.attr('transform', event.transform);
+            });
+
+        svg.call(zoom);
+
+        // Main group
+        const g = svg.append('g');
+
+        // Define arrow marker
+        g.append('defs').append('marker')
+            .attr('id', 'arrowhead')
+            .attr('viewBox', '0 -5 10 10')
+            .attr('refX', 8)
+            .attr('refY', 0)
+            .attr('markerWidth', 6)
+            .attr('markerHeight', 6)
+            .attr('orient', 'auto')
+            .append('path')
+            .attr('d', 'M0,-5L10,0L0,5')
+            .attr('fill', '#94a3b8');
+
+        // Color scheme
+        const colors = {
+            start: '#3b82f6',
+            process: '#3b82f6',  // Generator uses blue (same as start)
+            filter: '#10b981',
+            decision: '#f59e0b',
+            revise: '#f97316',
+            success: '#22c55e',
+            fail: '#ef4444'
+        };
+
+        // Draw links
+        const links = g.selectAll('.link')
+            .data(flowchartData.links)
+            .enter()
+            .append('g')
+            .attr('class', 'link-group');
+
+        links.append('path')
+            .attr('class', 'link')
+            .attr('d', d => {
+                const source = flowchartData.nodes.find(n => n.id === d.source);
+                const target = flowchartData.nodes.find(n => n.id === d.target);
+                return `M${source.x},${source.y + 30} L${target.x},${target.y - 30}`;
+            });
+
+        links.append('text')
+            .attr('class', 'link-label')
+            .attr('x', d => {
+                const source = flowchartData.nodes.find(n => n.id === d.source);
+                const target = flowchartData.nodes.find(n => n.id === d.target);
+                return (source.x + target.x) / 2 + 10;
+            })
+            .attr('y', d => {
+                const source = flowchartData.nodes.find(n => n.id === d.source);
+                const target = flowchartData.nodes.find(n => n.id === d.target);
+                return (source.y + target.y) / 2;
+            })
+            .text(d => d.label || '');
+
+        // Draw nodes
+        const nodes = g.selectAll('.node')
+            .data(flowchartData.nodes)
+            .enter()
+            .append('g')
+            .attr('class', 'node')
+            .attr('transform', d => `translate(${d.x},${d.y})`)
+            .on('click', (event, d) => {
+                if (d.section) {
+                    const section = document.getElementById(d.section);
+                    if (section) {
+                        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+                        // Highlight the clicked node
+                        d3.selectAll('.node').classed('active', false);
+                        d3.select(event.currentTarget).classed('active', true);
+                    }
+                }
+            });
+
+        nodes.append('rect')
+            .attr('class', 'node-rect')
+            .attr('x', -60)
+            .attr('y', -25)
+            .attr('width', 120)
+            .attr('height', 50)
+            .attr('fill', d => colors[d.type]);
+
+        nodes.append('text')
+            .attr('class', 'node-text')
+            .attr('y', -5)
+            .attr('fill', 'white')
+            .text(d => d.label);
+
+        nodes.append('text')
+            .attr('class', 'node-subtitle')
+            .attr('y', 10)
+            .attr('fill', 'white')
+            .text(d => d.subtitle);
+
+        // Center the flowchart initially
+        function centerFlowchart() {
+            const bounds = g.node().getBBox();
+            const fullWidth = bounds.width;
+            const fullHeight = bounds.height;
+            const midX = bounds.x + fullWidth / 2;
+            const midY = bounds.y + fullHeight / 2;
+
+            const scale = 0.8;
+            const translate = [
+                width / 2 - scale * midX,
+                height / 2 - scale * midY
+            ];
+
+            svg.transition()
+                .duration(750)
+                .call(zoom.transform, d3.zoomIdentity
+                    .translate(translate[0], translate[1])
+                    .scale(scale));
+        }
+
+        function resetZoom() {
+            svg.transition()
+                .duration(750)
+                .call(zoom.transform, d3.zoomIdentity);
+        }
+
+        // Auto-highlight nodes based on scroll position
+        window.addEventListener('scroll', () => {
+            const sections = document.querySelectorAll('.section[id^="step-"]');
+            let currentSection = null;
+
+            sections.forEach(section => {
+                const rect = section.getBoundingClientRect();
+                if (rect.top <= 200 && rect.bottom >= 200) {
+                    currentSection = section.id;
+                }
+            });
+
+            if (currentSection) {
+                d3.selectAll('.node').classed('active', false);
+                d3.selectAll('.node').each(function (d) {
+                    if (d.section === currentSection) {
+                        d3.select(this).classed('active', true);
+                    }
+                });
+            }
+        });
+
+        // Initialize centered
+        setTimeout(centerFlowchart, 100);
+
+        // ============================================
+        // Question Pipeline Flowchart
+        // ============================================
+        const questionFlowchartData = {
+            nodes: [
+                { id: 'q-start', label: 'Start', subtitle: '지문 입력', type: 'start', x: 400, y: 50 },
+                { id: 'q-step-1', label: '1. Question Generator', subtitle: 'chatgpt-4o-latest', type: 'process', x: 400, y: 150, section: 'q-step-1' },
+                { id: 'q-step-2', label: '2. Meta Labeling', subtitle: '3가지 분석', type: 'decision', x: 400, y: 250, section: 'q-step-2' },
+                { id: 'q-step-2a', label: '2a. Stem Analysis', subtitle: '질문 구조 분류', type: 'process', x: 200, y: 350, section: 'q-step-2a' },
+                { id: 'q-step-2b', label: '2b. Options Structure', subtitle: '선택지 구조 분류', type: 'process', x: 400, y: 350, section: 'q-step-2b' },
+                { id: 'q-step-2c', label: '2c. Options Language', subtitle: '언어 관계 분류', type: 'process', x: 600, y: 350, section: 'q-step-2c' },
+                { id: 'q-final', label: 'Final', subtitle: '메타데이터 완료', type: 'success', x: 400, y: 450 }
+            ],
+            links: [
+                { source: 'q-start', target: 'q-step-1' },
+                { source: 'q-step-1', target: 'q-step-2' },
+                { source: 'q-step-2', target: 'q-step-2a' },
+                { source: 'q-step-2', target: 'q-step-2b' },
+                { source: 'q-step-2', target: 'q-step-2c' },
+                { source: 'q-step-2a', target: 'q-final' },
+                { source: 'q-step-2b', target: 'q-final' },
+                { source: 'q-step-2c', target: 'q-final' }
+            ]
+        };
+
+        const qSvg = d3.select('#question-flowchart');
+        const qWidth = qSvg.node().parentElement?.getBoundingClientRect().width || 800;
+        const qHeight = 600;
+
+        qSvg.attr('width', qWidth).attr('height', qHeight);
+
+        // Create zoom behavior for question flowchart
+        const qZoom = d3.zoom()
+            .scaleExtent([0.5, 2])
+            .on('zoom', (event) => {
+                qG.attr('transform', event.transform);
+            });
+
+        qSvg.call(qZoom);
+
+        // Main group for question flowchart
+        const qG = qSvg.append('g');
+
+        // Define arrow marker for question flowchart
+        qG.append('defs').append('marker')
+            .attr('id', 'q-arrowhead')
+            .attr('viewBox', '0 -5 10 10')
+            .attr('refX', 8)
+            .attr('refY', 0)
+            .attr('markerWidth', 6)
+            .attr('markerHeight', 6)
+            .attr('orient', 'auto')
+            .append('path')
+            .attr('d', 'M0,-5L10,0L0,5')
+            .attr('fill', '#94a3b8');
+
+        // Color scheme for question pipeline (purple theme)
+        const qColors = {
+            start: '#7c3aed',
+            process: '#7c3aed',
+            decision: '#a78bfa',
+            success: '#22c55e'
+        };
+
+        // Draw links for question flowchart
+        const qLinks = qG.selectAll('.link')
+            .data(questionFlowchartData.links)
+            .enter()
+            .append('g')
+            .attr('class', 'link-group');
+
+        qLinks.append('path')
+            .attr('class', 'link')
+            .attr('d', d => {
+                const source = questionFlowchartData.nodes.find(n => n.id === d.source);
+                const target = questionFlowchartData.nodes.find(n => n.id === d.target);
+                return `M${source.x},${source.y + 30} L${target.x},${target.y - 30}`;
+            })
+            .attr('marker-end', 'url(#q-arrowhead)');
+
+        // Draw nodes for question flowchart
+        const qNodes = qG.selectAll('.node')
+            .data(questionFlowchartData.nodes)
+            .enter()
+            .append('g')
+            .attr('class', 'node')
+            .attr('transform', d => `translate(${d.x},${d.y})`)
+            .on('click', (event, d) => {
+                if (d.section) {
+                    const section = document.getElementById(d.section);
+                    if (section) {
+                        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+                        // Highlight the clicked node
+                        d3.selectAll('#question-flowchart .node').classed('active', false);
+                        d3.select(event.currentTarget).classed('active', true);
+                    }
+                }
+            });
+
+        qNodes.append('rect')
+            .attr('class', 'node-rect')
+            .attr('x', -70)
+            .attr('y', -25)
+            .attr('width', 140)
+            .attr('height', 50)
+            .attr('fill', d => qColors[d.type]);
+
+        qNodes.append('text')
+            .attr('class', 'node-text')
+            .attr('y', -5)
+            .attr('fill', 'white')
+            .text(d => d.label);
+
+        qNodes.append('text')
+            .attr('class', 'node-subtitle')
+            .attr('y', 10)
+            .attr('fill', 'white')
+            .text(d => d.subtitle);
+
+        // Center the question flowchart initially
+        function centerQuestionFlowchart() {
+            const bounds = qG.node().getBBox();
+            const fullWidth = bounds.width;
+            const fullHeight = bounds.height;
+            const midX = bounds.x + fullWidth / 2;
+            const midY = bounds.y + fullHeight / 2;
+
+            const scale = 0.8;
+            const translate = [
+                qWidth / 2 - scale * midX,
+                qHeight / 2 - scale * midY
+            ];
+
+            qSvg.transition()
+                .duration(750)
+                .call(qZoom.transform, d3.zoomIdentity
+                    .translate(translate[0], translate[1])
+                    .scale(scale));
+        }
+
+        function resetQuestionZoom() {
+            qSvg.transition()
+                .duration(750)
+                .call(qZoom.transform, d3.zoomIdentity);
+        }
+
+        // Initialize question flowchart centered
+        setTimeout(centerQuestionFlowchart, 100);
+
+        // ============================================
+        // Pipeline Tab Switching
+        // ============================================
+        function switchPipeline(pipeline) {
+            // Update tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`.tab-btn[data-tab="${pipeline}"]`).classList.add('active');
+
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`${pipeline}-content`).classList.add('active');
+
+            // Update sidebar navigation
+            document.querySelectorAll('.nav-content').forEach(nav => {
+                nav.style.display = 'none';
+            });
+            document.querySelector(`.nav-content[data-pipeline="${pipeline}"]`).style.display = 'block';
+
+            // Update hero section
+            if (pipeline === 'passage') {
+                document.getElementById('heroTitle').innerHTML = '🎯 TFT Passage Generation Pipeline';
+                document.getElementById('heroDescription').innerHTML = '교육용 영어 지문을 자동으로 생성하고, 품질을 검증하며, 필요시 자동으로 수정하는 <br></br>MT Further Practice Pipeline 가이드입니다.';
+                document.getElementById('heroStats').innerHTML = `
+                    <div class="stat-card">
+                        <span class="stat-number">8</span>
+                        <span class="stat-label">Processing Steps</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number">3</span>
+                        <span class="stat-label">Key Metrics</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number">4</span>
+                        <span class="stat-label">LLM Validations</span>
+                    </div>
+                `;
+            } else if (pipeline === 'question') {
+                document.getElementById('heroTitle').innerHTML = '❓ TFT Question Generation Pipeline';
+                document.getElementById('heroDescription').innerHTML = '주어진 지문을 기반으로 독해 문제를 생성하고, 문항의 구조적·언어적 특성을 메타 분석하는 <br>Question Pipeline 가이드입니다.';
+                document.getElementById('heroStats').innerHTML = `
+                    <div class="stat-card">
+                        <span class="stat-number">2</span>
+                        <span class="stat-label">Main Steps</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number">3</span>
+                        <span class="stat-label">Meta Analyses</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number">5</span>
+                        <span class="stat-label">Classification Types</span>
+                    </div>
+                `;
+                // Redraw question flowchart when switching to question tab
+                setTimeout(() => {
+                    centerQuestionFlowchart();
+                }, 100);
+            }
+
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // ============================================
+        // Navigation & Sidebar
+        // ============================================
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('show');
+        }
+
+        function setActive(element) {
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            element.classList.add('active');
+
+            if (window.innerWidth <= 768) {
+                document.getElementById('sidebar').classList.remove('show');
+            }
+        }
+
+        // Auto-highlight nav items on scroll
+        window.addEventListener('scroll', () => {
+            const sections = document.querySelectorAll('.section');
+            const navItems = document.querySelectorAll('.nav-item');
+
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (window.pageYOffset >= sectionTop - 200) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navItems.forEach(item => {
+                item.classList.remove('active');
+                if (item.getAttribute('href') === `#${current}`) {
+                    item.classList.add('active');
+                }
+            });
+        });
+
+        // ============================================
+        // Dark Mode Toggle
+        // ============================================
+        function toggleDarkMode() {
+            const body = document.body;
+            const themeIcon = document.getElementById('themeIcon');
+            const themeText = document.getElementById('themeText');
+
+            body.classList.toggle('dark-mode');
+
+            if (body.classList.contains('dark-mode')) {
+                themeIcon.textContent = '☀️';
+                themeText.textContent = 'Light';
+                localStorage.setItem('theme', 'dark');
+            } else {
+                themeIcon.textContent = '🌙';
+                themeText.textContent = 'Dark';
+                localStorage.setItem('theme', 'light');
+            }
+        }
+
+        // Load saved theme
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                document.body.classList.add('dark-mode');
+                document.getElementById('themeIcon').textContent = '☀️';
+                document.getElementById('themeText').textContent = 'Light';
+            }
+        });
+
+        // ============================================
+        // Search Functionality
+        // ============================================
+        const searchInput = document.getElementById('searchInput');
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            if (query.length < 2) {
+                clearSearchHighlights();
+                return;
+            }
+
+            const sections = document.querySelectorAll('.section-content');
+            sections.forEach(section => {
+                const text = section.textContent.toLowerCase();
+                if (text.includes(query)) {
+                    section.style.background = 'rgba(37, 99, 235, 0.1)';
+                } else {
+                    section.style.background = '';
+                }
+            });
+        });
+
+        function clearSearchHighlights() {
+            document.querySelectorAll('.section-content').forEach(section => {
+                section.style.background = '';
+            });
+        }
+
+        // ============================================
+        // Code Copy Functionality
+        // ============================================
+        function copyCode(button) {
+            const codeBlock = button.closest('.code-block');
+            const code = codeBlock.querySelector('pre').textContent;
+
+            navigator.clipboard.writeText(code).then(() => {
+                const originalText = button.textContent;
+                button.textContent = '✅ Copied!';
+                button.style.background = 'var(--success)';
+                button.style.color = 'white';
+
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.style.background = '';
+                    button.style.color = '';
+                }, 2000);
+            });
+        }
+
+        // ============================================
+        // Smooth Scroll
+        // ============================================
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // ============================================
+        // Keyboard Shortcuts
+        // ============================================
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                document.getElementById('searchInput').focus();
+            }
+
+            if (e.key === 'Escape') {
+                document.getElementById('searchInput').value = '';
+                clearSearchHighlights();
+            }
+        });
+
+        console.log('%c📚 TFT Pipeline Interactive Guide', 'font-size: 20px; font-weight: bold; color: #2563eb;');
+        console.log('%c✅ Passage & Question Pipeline Integration Complete', 'font-size: 14px; color: #10b981;');
+        console.log('%c- Tab system for pipeline switching', 'font-size: 12px; color: #6c757d;');
+        console.log('%c- Dual flowcharts with D3.js', 'font-size: 12px; color: #6c757d;');
+        console.log('%c- Dynamic sidebar navigation', 'font-size: 12px; color: #6c757d;');
+        console.log('%c- Interactive nodes with click-to-scroll', 'font-size: 12px; color: #6c757d;');
+        console.log('%c- Zoom and pan support for both pipelines', 'font-size: 12px; color: #6c757d;');
+    </script>
+</body>
+
+</html>

@@ -49,7 +49,7 @@ class PipelineProcessor:
             
             trace.append(TraceStep(
                 step="analyze",
-                metrics=metrics.dict(),
+                metrics=metrics.model_dump(),
                 syntax_pass=evaluation.syntax_pass,
                 lexical_pass=evaluation.lexical_pass
             ))
@@ -117,7 +117,7 @@ class PipelineProcessor:
         # 현재 지표 분석
         raw_analysis = await analyzer.analyze(text, payload.include_syntax)
         current_metrics_obj = metrics_extractor.extract(raw_analysis)
-        current_metrics = current_metrics_obj.dict()
+        current_metrics = current_metrics_obj.model_dump()
         
         candidates, selected_text = await syntax_fixer.fix_syntax(
             text, master, tolerance_abs, tolerance_ratio, current_metrics, "", payload.syntax_candidates
@@ -139,7 +139,7 @@ class PipelineProcessor:
         
         trace.append(TraceStep(
             step="reanalyze_after_syntax",
-            metrics=metrics.dict(),
+            metrics=metrics.model_dump(),
             syntax_pass=evaluation.syntax_pass,
             lexical_pass=evaluation.lexical_pass
         ))
@@ -184,7 +184,7 @@ class PipelineProcessor:
         
         trace.append(TraceStep(
             step="reanalyze_after_lexical",
-            metrics=metrics.dict(),
+            metrics=metrics.model_dump(),
             syntax_pass=evaluation.syntax_pass,
             lexical_pass=evaluation.lexical_pass
         ))

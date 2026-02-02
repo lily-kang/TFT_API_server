@@ -72,8 +72,20 @@ class SyntaxFixer:
                 mapped_metrics,
                 problematic_metric, num_modifications, referential_clauses, prompt_type
             )
-            print(prompt[0]['content'])
-            print(prompt[1]['content'])
+            
+            # 📋 구문 수정 프롬프트 로깅
+            logger.info("=" * 80)
+            logger.info("🔧 [SYNTAX FIX] 프롬프트 생성")
+            logger.info("=" * 80)
+            logger.info(f"📊 목표 범위:")
+            logger.info(f"   - 평균 문장 길이: {avg_target_min:.2f} ~ {avg_target_max:.2f}")
+            logger.info(f"   - 내포절 비율: {clause_target_min:.3f} ~ {clause_target_max:.3f}")
+            logger.info(f"🎯 문제 지표: {problematic_metric}, 수정 문장 수: {num_modifications}, 타입: {prompt_type}")
+            logger.info("-" * 80)
+            logger.info(f"🤖 [SYSTEM 프롬프트]:\n{prompt[0]['content']}")
+            logger.info("-" * 80)
+            logger.info(f"👤 [USER 프롬프트]:\n{prompt[1]['content']}")
+            logger.info("=" * 80)
             
             # 각 temperature별로 여러 후보 생성
             candidates = await llm_client.generate_multiple_messages_per_temperature(prompt)
@@ -418,9 +430,9 @@ class SyntaxFixer:
         try:
             # 후보 텍스트 분석
             raw_analysis = await analyzer.analyze(candidate, include_syntax=True)
-            candidate_metrics = metrics_extractor.extract(raw_analysis)
-            candidate_evaluation = judge.evaluate(candidate_metrics, master, tolerance_abs, tolerance_ratio)
-            return candidate_metrics, candidate_evaluation
+            candidate_metrics_obj = metrics_extractor.extract(raw_analysis)
+            candidate_evaluation = judge.evaluate(candidate_metrics_obj, master, tolerance_abs, tolerance_ratio)
+            return candidate_metrics_obj.model_dump(), candidate_evaluation
         except Exception as e:
             logger.error(f"후보 분석 실패: {str(e)}")
             raise
@@ -449,12 +461,13 @@ class SyntaxFixer:
         try:
             # 후보 텍스트 분석
             raw_analysis = await analyzer.analyze(candidate, include_syntax=True)
-            candidate_metrics = metrics_extractor.extract(raw_analysis)
+            candidate_metrics_obj = metrics_extractor.extract(raw_analysis)
+            candidate_metrics_dict = candidate_metrics_obj.model_dump()
             candidate_evaluation = judge.evaluate_with_ranges(
-                candidate_metrics, avg_target_min, avg_target_max, 
+                candidate_metrics_dict, avg_target_min, avg_target_max,
                 clause_target_min, clause_target_max
             )
-            return candidate_metrics, candidate_evaluation
+            return candidate_metrics_dict, candidate_evaluation
         except Exception as e:
             logger.error(f"후보 분석 실패: {str(e)}")
             raise

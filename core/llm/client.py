@@ -16,15 +16,21 @@ def _sanitize_err(msg: str) -> str:
     except Exception:
         return "(unavailable)"
 
-class LLMClientForProfile:
-    """OpenAI LLM API 클라이언트"""
-    
+class LLMClient:
+    """통합 OpenAI LLM API 클라이언트 (AsyncOpenAI 사용)
+
+    - 구조화된 응답 (JSON Schema) 지원
+    - 다중 후보 생성 및 선택
+    - 구문/어휘 수정, Semantic profiling 모두 지원
+    """
+
     def __init__(self):
         self.model = settings.openai_model
         self._client = None
         self._client_init_error: Optional[str] = None
-    
-        
+        self.temperatures = settings.llm_temperatures
+        self.candidates_per_temperature = settings.syntax_candidates_per_temperature
+
     @property
     def client(self):
         """Lazy initialization으로 OpenAI 클라이언트 생성"""
@@ -36,27 +42,28 @@ class LLMClientForProfile:
                     logger.error("OPENAI_API_KEY가 설정되지 않아 OpenAI 클라이언트를 초기화할 수 없습니다.")
                     self._client = None
                     return None
-                self._client = openai.OpenAI(api_key=api_key)
+                self._client = openai.AsyncOpenAI(api_key=api_key)
                 self._client_init_error = None
-                logger.info("OpenAI 클라이언트 초기화 성공")
+                logger.info("AsyncOpenAI 클라이언트 초기화 성공")
             except Exception as e:
                 self._client_init_error = f"{type(e).__name__}: {_sanitize_err(str(e))}"
                 logger.error(f"OpenAI 클라이언트 초기화 실패: {self._client_init_error}")
                 self._client = None
         return self._client
-    
-    async def generate_text(self, prompt: str, temperature: Optional[float] = None, output_schema: Optional[object] = None) -> str:
+
+    async def generate_text(self, prompt: str, temperature: Optional[float] = None, max_tokens: Optional[int] = None, output_schema: Optional[object] = None) -> str:
         """
-        단일 텍스트 생성
-        
+        단일 텍스트 생성 (구조화된 응답 지원)
+
         Args:
             prompt: 생성 프롬프트
-            temperature: 생성 온도 (0.0~1.0)
-            max_tokens: 최대 토큰 수
-            
+            temperature: 생성 온도 (0.0~1.0), None이면 0.7 사용
+            max_tokens: 최대 토큰 수 (사용 안 함, settings에서 가져옴)
+            output_schema: JSON Schema 객체 또는 파일 경로 (구조화된 응답용)
+
         Returns:
             생성된 텍스트
-            
+
         Raises:
             LLMAPIError: LLM API 호출 실패 시
         """
@@ -65,24 +72,25 @@ class LLMClientForProfile:
                 reason = self._client_init_error
                 suffix = f": {reason}" if reason else ""
                 raise LLMAPIError(f"OpenAI 클라이언트가 초기화되지 않았습니다{suffix}")
-            
-            # response_format 준비 (파일 경로/사전 모두 허용)
+
+            # temperature 기본값 설정
+            if temperature is None:
+                temperature = 0.7
+
+            # response_format 준비 (output_schema가 제공된 경우)
             prepared_response_format = None
-            try:
-                if output_schema is not None:
+            if output_schema is not None:
+                try:
                     schema_data = None
                     # 파일 경로 지원
-                    try:
-                        from pathlib import Path as _Path
-                        if isinstance(output_schema, (str, _Path)):
-                            import json as _json
-                            p = _Path(output_schema)
-                            with open(p, "r", encoding="utf-8") as f:
-                                schema_data = _json.load(f)
-                        elif isinstance(output_schema, dict):
-                            schema_data = output_schema
-                    except Exception as _e:
-                        logger.warning(f"output_schema 로드 실패: {_e}")
+                    from pathlib import Path as _Path
+                    if isinstance(output_schema, (str, _Path)):
+                        import json as _json
+                        p = _Path(output_schema)
+                        with open(p, "r", encoding="utf-8") as f:
+                            schema_data = _json.load(f)
+                    elif isinstance(output_schema, dict):
+                        schema_data = output_schema
 
                     if isinstance(schema_data, dict):
                         # wrapping 키가 있는 경우(semantic_profile 등) 추출
@@ -95,158 +103,22 @@ class LLMClientForProfile:
                                 prepared_response_format = schema_data[first_key]
                             except Exception:
                                 prepared_response_format = None
+                except Exception as e_pf:
+                    logger.warning(f"response_format 준비 경고: {e_pf}")
 
-            except Exception as e_pf:
-                logger.warning(f"response_format 준비 경고: {e_pf}")
-
-            # 동기 호출 사용 (openai 라이브러리의 최신 버전에서는 동기 호출이 기본)
-            response = self.client.chat.completions.create(
+            # 비동기 호출 사용 (AsyncOpenAI)
+            response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=temperature,
                 max_tokens=settings.llm_max_output_tokens,
                 response_format=prepared_response_format
             )
-            
+
             generated_text = response.choices[0].message.content.strip()
             logger.info(f"텍스트 생성 성공 (temp={temperature}): {len(generated_text)} 글자")
             return generated_text
-            
-        except Exception as e:
-            logger.error(f"텍스트 생성 실패 (temp={temperature}): {str(e)}")
-            raise LLMAPIError(f"텍스트 생성 실패: {str(e)}")
-    
-    async def generate_multiple(self, prompt: str, temperatures: List[float]) -> List[str]:
-        """
-        여러 temperature로 텍스트 생성 (호환성 유지용)
-        
-        Args:
-            prompt: 생성 프롬프트
-            temperatures: temperature 리스트
-            
-        Returns:
-            생성된 텍스트 리스트
-        """
-        results = []
-        for temp in temperatures:
-            try:
-                text = await self.generate_text(prompt, temperature=temp)
-                results.append(text)
-            except LLMAPIError as e:
-                logger.warning(f"Temperature {temp}에서 생성 실패: {str(e)}")
-                results.append(f"[생성 실패: {str(e)}]")
-        return results
 
-    
-    async def _generate_sequential_fallback(
-        self, 
-        prompt: str, 
-        temperatures: List[float], 
-        candidates_per_temp: int
-    ) -> List[str]:
-        """병렬 처리 실패 시 순차 처리 폴백"""
-        results = []
-        
-        for temp in temperatures:
-            logger.info(f"Temperature {temp}로 {candidates_per_temp}개 후보 생성 중... (순차 처리)")
-            
-            for i in range(candidates_per_temp):
-                try:
-                    text = await self.generate_text(prompt, temperature=temp)
-                    results.append(text)
-                    logger.info(f"  후보 {len(results)}: 생성 완료 (temp={temp}, {i+1}/{candidates_per_temp})")
-                except LLMAPIError as e:
-                    logger.warning(f"  후보 생성 실패 (temp={temp}, {i+1}/{candidates_per_temp}): {str(e)}")
-                    results.append(f"[생성 실패: {str(e)}]")
-        
-        logger.info(f"순차 처리 완료: 총 {len(results)}개 후보")
-        return results
-    
-
-    async def generate_messages(self, messages: List[dict], temperature: float = 0.7, max_tokens: Optional[int] = None) -> str:
-        """
-        메시지(roles 포함)를 사용하는 생성 메서드
-        """
-        try:
-            if not self.client:
-                raise LLMAPIError("OpenAI 클라이언트가 초기화되지 않았습니다")
-
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=settings.llm_max_output_tokens
-            )
-            generated_text = response.choices[0].message.content.strip()
-            logger.info(f"메시지 기반 텍스트 생성 성공 (temp={temperature}): {len(generated_text)} 글자")
-            return generated_text
-        except Exception as e:
-            logger.error(f"메시지 기반 텍스트 생성 실패 (temp={temperature}): {str(e)}")
-            raise LLMAPIError(f"텍스트 생성 실패: {str(e)}")
-        
-class LLMClient:
-    """OpenAI LLM API 클라이언트"""
-    
-    def __init__(self):
-        self.model = settings.openai_model
-        self._client = None
-        self._client_init_error: Optional[str] = None
-        self.temperatures = settings.llm_temperatures
-        self.candidates_per_temperature = settings.syntax_candidates_per_temperature
-        
-    @property
-    def client(self):
-        """Lazy initialization으로 OpenAI 클라이언트 생성"""
-        if self._client is None:
-            try:
-                api_key = (settings.openai_api_key or os.getenv("OPENAI_API_KEY") or "").strip()
-                if not api_key:
-                    self._client_init_error = "OPENAI_API_KEY is missing/empty"
-                    logger.error("OPENAI_API_KEY가 설정되지 않아 OpenAI 클라이언트를 초기화할 수 없습니다.")
-                    self._client = None
-                    return None
-                self._client = openai.OpenAI(api_key=api_key)
-                self._client_init_error = None
-                logger.info("OpenAI 클라이언트 초기화 성공")
-            except Exception as e:
-                self._client_init_error = f"{type(e).__name__}: {_sanitize_err(str(e))}"
-                logger.error(f"OpenAI 클라이언트 초기화 실패: {self._client_init_error}")
-                self._client = None
-        return self._client
-    
-    async def generate_text(self, prompt: str, temperature: float = 0.7, max_tokens: Optional[int] = None) -> str:
-        """
-        단일 텍스트 생성
-        
-        Args:
-            prompt: 생성 프롬프트
-            temperature: 생성 온도 (0.0~1.0)
-            max_tokens: 최대 토큰 수
-            
-        Returns:
-            생성된 텍스트
-            
-        Raises:
-            LLMAPIError: LLM API 호출 실패 시
-        """
-        try:
-            if not self.client:
-                reason = self._client_init_error
-                suffix = f": {reason}" if reason else ""
-                raise LLMAPIError(f"OpenAI 클라이언트가 초기화되지 않았습니다{suffix}")
-            
-            # 동기 호출 사용 (openai 라이브러리의 최신 버전에서는 동기 호출이 기본)
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=temperature,
-                max_tokens=settings.llm_max_output_tokens
-            )
-            
-            generated_text = response.choices[0].message.content.strip()
-            logger.info(f"텍스트 생성 성공 (temp={temperature}): {len(generated_text)} 글자")
-            return generated_text
-            
         except Exception as e:
             logger.error(f"텍스트 생성 실패 (temp={temperature}): {str(e)}")
             raise LLMAPIError(f"텍스트 생성 실패: {str(e)}")
@@ -295,7 +167,6 @@ class LLMClient:
         
         for temp in temperatures:
             for i in range(candidates_per_temp):
-                print(f"temp: {temp}")
                 task = self.generate_text(prompt, temperature=temp)
                 tasks.append(task)
                 task_info.append((temp, i + 1, candidates_per_temp))
@@ -398,7 +269,7 @@ class LLMClient:
             if not self.client:
                 raise LLMAPIError("OpenAI 클라이언트가 초기화되지 않았습니다")
 
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
                 temperature=temperature,
@@ -444,6 +315,8 @@ class LLMClient:
             return []
 
 
-# 전역 LLM 클라이언트 인스턴스
-llm_client = LLMClient() 
-llm_client_for_profile = LLMClientForProfile()
+# 전역 LLM 클라이언트 인스턴스 (통합됨)
+llm_client = LLMClient()
+
+# 하위 호환성: llm_client_for_profile은 llm_client의 별칭
+llm_client_for_profile = llm_client

@@ -7,6 +7,7 @@ import yaml
 import re
 from core.llm.client import llm_client_for_profile
 from config.profile_gen_prompt import SEMANTIC_PROFILE_GEN_TEMPLATE, SUBTOPIC2_GEN_TEMPLATE
+from utils.logging import logger
 
 
 # Service-level constants
@@ -14,12 +15,25 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _CONFIG_DIR = _PROJECT_ROOT / "config"
 _OUTPUT_SCHEMA = _CONFIG_DIR / "output_schema.json"
 
+# YAML 캐시 (성능 최적화: 배치 처리 시 반복 로딩 방지)
+_AR_CATEGORY_CACHE: Optional[Dict[str, List[str]]] = None
+
 async def generate_semantic_profile_for_passage(passage_text: str) -> Dict[str, Any]:
 	"""
 	LLM 2단계 호출로 sample 형태의 의미 프로필을 생성한다. (subtopic_2는 2차 생성)
 	"""
 	# 1) subtopic_2 제외 프로필 생성
 	prompt_1 = SEMANTIC_PROFILE_GEN_TEMPLATE.format(var_passage_text=passage_text)
+	
+	# 📋 1차 프롬프트 로깅
+	logger.info("=" * 80)
+	logger.info("🔍 [SEMANTIC PROFILE] 1차 프롬프트 생성")
+	logger.info("=" * 80)
+	logger.info(f"📄 입력 지문 (처음 500자):\n{passage_text[:500]}...")
+	logger.info("-" * 80)
+	logger.info(f"📝 1차 프롬프트:\n{prompt_1}")
+	logger.info("=" * 80)
+	# ------------------------------------------------------------
 	first_pass_text = await llm_client_for_profile.generate_text(prompt_1, output_schema=_OUTPUT_SCHEMA)
 	profile = _parse_first_pass_profile(first_pass_text)
 	print("first_pass_text", first_pass_text)
@@ -36,12 +50,32 @@ async def generate_semantic_profile_for_passage(passage_text: str) -> Dict[str, 
 		var_passage_summary=summary_text,
 		var_relevant_ar_category_data=ar_subset_text,
 	)
+	
+	# 📋 2차 프롬프트 로깅
+	logger.info("=" * 80)
+	logger.info("🔍 [SEMANTIC PROFILE] 2차 프롬프트 생성")
+	logger.info("=" * 80)
+	logger.info(f"📊 1차 프로필 요약:\n{summary_text}")
+	logger.info("-" * 80)
+	logger.info(f"🏷️  AR 카테고리 데이터:\n{ar_subset_text}")
+	logger.info("-" * 80)
+	logger.info(f"📝 2차 프롬프트:\n{prompt_2}")
+	logger.info("=" * 80)
+	# ------------------------------------------------------------
 	# print("prompt_2", prompt_2)
 	subtopic_2 = (await llm_client_for_profile.generate_text(prompt_2)).strip()
 	print("subtopic_2", subtopic_2)
 
 	# 4) 결합
 	profile["subtopic_2"] = subtopic_2
+	
+	# ✅ 최종 프로필 로깅
+	logger.info("=" * 80)
+	logger.info("✅ [SEMANTIC PROFILE] 생성 완료")
+	logger.info("=" * 80)
+	logger.info(f"📋 최종 프로필:\n{json.dumps(profile, ensure_ascii=False, indent=2)}")
+	logger.info("=" * 80)
+	# ------------------------------------------------------------
 	return profile
 
 
@@ -254,18 +288,48 @@ def _summarize_for_subtopic2(profile: Dict[str, Any]) -> str:
 
 def _load_ar_category_map() -> Dict[str, List[str]]:
 	"""
-	구조화된 YAML 파일만 사용하여 로드한다.
+	구조화된 YAML 파일을 로드한다 (캐싱 적용).
 	파일: config/ar_category_structured.yaml
 	스키마: { "Subtopic_1": ["Option1", "Option2", ...], ... }
+
+	성능 최적화: 첫 호출 시 로드 후 캐시에 저장, 이후 호출은 캐시 반환.
+	배치 처리 시 파일 I/O 오버헤드 제거 (50개 배치 → 1번만 로드).
 	"""
+	global _AR_CATEGORY_CACHE
+
+	# 캐시가 이미 있으면 즉시 반환
+	if _AR_CATEGORY_CACHE is not None:
+		return _AR_CATEGORY_CACHE
+
+	# 캐시 없음 - 파일 로드
 	structured_yaml = _CONFIG_DIR / "ar_category_structured.yaml"
 	if not structured_yaml.exists():
-		return {}
+		logger.warning(f"AR category YAML 파일 없음: {structured_yaml}")
+		_AR_CATEGORY_CACHE = {}
+		return _AR_CATEGORY_CACHE
+
 	try:
 		with open(structured_yaml, "r", encoding="utf-8") as f:
 			data = yaml.safe_load(f) or {}
 			if isinstance(data, dict):
-				return {k: [str(x) for x in (v or [])] for k, v in data.items()}
-			return {}
-	except Exception:
-		return {} 
+				_AR_CATEGORY_CACHE = {k: [str(x) for x in (v or [])] for k, v in data.items()}
+			else:
+				_AR_CATEGORY_CACHE = {}
+
+		logger.info(f"AR category 맵 로드 완료: {len(_AR_CATEGORY_CACHE)} 카테고리 캐시됨")
+		return _AR_CATEGORY_CACHE
+	except Exception as e:
+		logger.error(f"AR category YAML 로드 실패: {e}")
+		_AR_CATEGORY_CACHE = {}
+		return _AR_CATEGORY_CACHE
+
+
+def clear_ar_category_cache():
+	"""
+	AR category 캐시를 무효화한다.
+	YAML 파일 수정 후 재로드가 필요한 경우 사용.
+	주로 개발/테스트 환경에서 사용.
+	"""
+	global _AR_CATEGORY_CACHE
+	_AR_CATEGORY_CACHE = None
+	logger.info("AR category 캐시 무효화됨") 

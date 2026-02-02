@@ -45,67 +45,6 @@ class PromptBuilder:
             logger.warning(f"CEFR breakdown 변환 실패: {str(e)}, 원본 반환")
             return str(cefr_breakdown)
     
-    # def build_syntax_prompt(
-    #     self,
-    #     text: str,
-    #     target_min: float,
-    #     target_max: float,
-    #     current_metrics: Dict[str, float],
-    #     problematic_metric: str,
-    #     num_modifications: int,
-    #     referential_clauses: str = "",
-    #     prompt_type: str = "increase"  # "increase" or "decrease"
-    # ) -> str:
-    #     """
-    #     구문 수정용 프롬프트 구성
-        
-    #     Args:
-    #         text: 수정할 텍스트
-    #         master: 마스터 지표
-    #         tolerance_abs: 절대값 허용 오차
-    #         tolerance_ratio: 비율 허용 오차
-    #         current_metrics: 현재 지표값들
-    #         problematic_metric: 문제가 있는 지표명
-    #         num_modifications: 수정할 문장 수
-    #         referential_clauses: 참조용 절 정보
-    #         prompt_type: 프롬프트 타입 ("increase" 또는 "decrease")
-            
-    #     Returns:
-    #         구성된 프롬프트 문자열
-    #     """
-    #     try:
-    #         # prompt_type에 따라 기본 프롬프트 선택
-    #         if prompt_type == "increase":
-    #             prompt = SYNTAX_PROMPT_INCREASE
-    #             logger.info(f"🔺 INCREASE 프롬프트 선택됨")
-    #         elif prompt_type == "decrease":
-    #             prompt = SYNTAX_PROMPT_DECREASE
-    #             logger.info(f"🔻 DECREASE 프롬프트 선택됨")
-    #         else:
-    #             prompt = SYNTAX_PROMPT_DECREASE  # 기본값
-    #             logger.warning(f"⚠️ 알 수 없는 prompt_type: {prompt_type}, DECREASE 사용")
-            
-            
-    #         # 프롬프트 변수 매핑
-    #         prompt_vars = {
-    #             'var_Generated_Passage': text,
-    #             'var_problematic_metric': problematic_metric,
-    #             'var_num_modifications': str(num_modifications),
-    #             'var_referential_clauses': referential_clauses or "No referential clauses provided.",
-    #             'var_current_value_embedded_clauses_ratio' : current_metrics.get('all_embedded_clauses_ratio', 0),
-    #             'var_target_range_embedded_clauses_ratio' : f"[{target_min:.3f} ~ {target_max:.3f}]",
-    #         }
-            
-    #         # 프롬프트 템플릿에 변수 삽입
-    #         for var_name, var_value in prompt_vars.items():
-    #             prompt = prompt.replace(f"{{{var_name}}}", str(var_value))
-            
-    #         logger.info(f"구문 수정 프롬프트 생성 완료 (문제 지표: {problematic_metric}, 수정 수: {num_modifications}, 타입: {prompt_type})")
-    #         return prompt
-            
-    #     except Exception as e:
-    #         logger.error(f"구문 프롬프트 생성 실패: {str(e)}")
-    #         raise
     
     def build_syntax_prompt(
         self,

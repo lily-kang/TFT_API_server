@@ -49,29 +49,26 @@ class LexicalFixer:
         try:
             logger.info(f"어휘 수정 시작: {len(text)}글자, 방향={direction}")
             
-            # # 목표 범위 계산
-            # target_min = master.CEFR_NVJD_A1A2_lemma_ratio - tolerance_ratio.CEFR_NVJD_A1A2_lemma_ratio
-            # target_max = master.CEFR_NVJD_A1A2_lemma_ratio + tolerance_ratio.CEFR_NVJD_A1A2_lemma_ratio
-
-            calc = prompt_builder.calculate_lexical_modification_count_nvjd(
+            # 어휘 수정 파라미터 계산
+            # 현재 CEFR 비율과 목표 범위를 기반으로 수정할 단어 수, 방향, 케이스 등을 계산
+            lexical_params = prompt_builder.calculate_lexical_modification_count_nvjd(
                 current_ratio=current_cefr_ratio,
                 nvjd_total_lemma_count=nvjd_total_lemma_count,
                 nvjd_a1a2_lemma_count=nvjd_a1a2_lemma_count,
                 master=master,
                 tolerance_ratio=tolerance_ratio,
             )
-            num_modifications = int(calc["num_modifications"])  # type: ignore
-            # 방향 우선순위: 계산결과 → 호출자 지정값
-            direction = calc.get("direction") if calc.get("direction") and calc.get("direction") != "none" else direction  # type: ignore
-            target_lower = calc["target_lower"]  # type: ignore
-            target_upper = calc["target_upper"]  # type: ignore
-            case_label = calc["case"]  # type: ignore
+            
+            # 계산된 파라미터 추출
+            num_modifications = int(lexical_params["num_modifications"])  # type: ignore
+            # 방향 우선순위: 계산된 방향 → 호출자 지정값
+            direction = lexical_params.get("direction") if lexical_params.get("direction") and lexical_params.get("direction") != "none" else direction  # type: ignore
+            target_lower = lexical_params["target_lower"]  # type: ignore
+            target_upper = lexical_params["target_upper"]  # type: ignore
+            case_label = lexical_params["case"]  # type: ignore (예: "below_range", "within_range", "above_range")
             computed_current_ratio = current_cefr_ratio
             nvjd_total = nvjd_total_lemma_count
             nvjd_a1a2 = nvjd_a1a2_lemma_count
-
-            # 프롬프트 방향 자동 결정 (현재 비율 기준)
-            # 방향은 외부 계산(calc['direction']) 결과를 사용 (재계산하지 않음)
             
             # 프롬프트 구성 (prompt_builder 사용)
             prompt = prompt_builder.build_lexical_prompt(
@@ -84,7 +81,20 @@ class LexicalFixer:
                 cefr_breakdown=cefr_breakdown
             )
             
-            logger.info(f"어휘 프롬프트 구성 완료, 수정단어수={num_modifications}, temperature={self.temperature}")
+            # 📋 어휘 수정 프롬프트 로깅
+            logger.info("=" * 80)
+            logger.info("📚 [LEXICAL FIX] 프롬프트 생성")
+            logger.info("=" * 80)
+            logger.info(f"📊 현재 CEFR A1A2 비율: {computed_current_ratio:.4f}")
+            logger.info(f"📊 목표 범위: {target_lower:.4f} ~ {target_upper:.4f}")
+            logger.info(f"📊 NVJD 총 렘마: {nvjd_total}, A1A2 렘마: {nvjd_a1a2}")
+            logger.info(f"🎯 수정 방향: {direction}, 수정 단어 수: {num_modifications}, Case: {case_label}")
+            logger.info(f"🌡️  Temperature: {self.temperature}")
+            logger.info("-" * 80)
+            logger.info(f"🤖 [SYSTEM 프롬프트]:\n{prompt[0]['content']}")
+            logger.info("-" * 80)
+            logger.info(f"👤 [USER 프롬프트]:\n{prompt[1]['content']}")
+            logger.info("=" * 80)
             
             # LLM 호출 (temperature 0.2로 3개 후보 생성)
             llm_candidates = await self._generate_lexical_candidates(prompt)
@@ -134,18 +144,24 @@ class LexicalFixer:
     # 제거됨: _calculate_lexical_modifications_from_analysis (외부 계산 사용)
 
     def _extract_nvjd_counts(self, raw_analysis: Dict[str, Any]) -> Dict[str, int]:
-        """분석기 응답에서 NVJD 관련 카운트 추출"""
+        """분석기 응답에서 NVJD 관련 카운트 추출
+        
+        Note: table_XX는 외부 분석기 API의 응답 테이블 구조
+        - table_02: 상세 토큰 정보
+        - table_09: 품사 분포
+        - table_11: 렘마 지표
+        """
         data = raw_analysis.get("data", {})
         text_statistics = data.get("text_statistics", {})
-        t02 = text_statistics.get("table_02_detailed_tokens", {})
-        t09 = text_statistics.get("table_09_pos_distribution", {})
-        t11 = text_statistics.get("table_11_lemma_metrics", {})
+        table_02 = text_statistics.get("table_02_detailed_tokens", {})
+        table_09 = text_statistics.get("table_09_pos_distribution", {})
+        table_11 = text_statistics.get("table_11_lemma_metrics", {})
 
         counts = {
-            "content_lemmas": int(t02.get("content_lemmas", 0) or 0),
-            "propn_lemma_count": int(t09.get("propn_lemma_count", 0) or 0),
-            "cefr_a1_NVJD_lemma_count": int(t11.get("cefr_a1_NVJD_lemma_count", 0) or 0),
-            "cefr_a2_NVJD_lemma_count": int(t11.get("cefr_a2_NVJD_lemma_count", 0) or 0),
+            "content_lemmas": int(table_02.get("content_lemmas", 0) or 0),
+            "propn_lemma_count": int(table_09.get("propn_lemma_count", 0) or 0),
+            "cefr_a1_NVJD_lemma_count": int(table_11.get("cefr_a1_NVJD_lemma_count", 0) or 0),
+            "cefr_a2_NVJD_lemma_count": int(table_11.get("cefr_a2_NVJD_lemma_count", 0) or 0),
         }
         logger.info(f"NVJD 카운트 추출: {counts}")
         return counts
@@ -298,17 +314,28 @@ class LexicalFixer:
         return sorted(merged_by_st.values(), key=lambda r: r["st_id"])
     
     async def _generate_lexical_candidates(self, prompt: List[Dict[str, str]]) -> List[str]:
-        """어휘 수정 후보 생성"""
+        """어휘 수정 후보 생성 (병렬 처리)"""
+        # 병렬로 모든 후보 생성 태스크 생성
+        tasks = [
+            llm_client.generate_messages(prompt, temperature=self.temperature)
+            for _ in range(self.candidates_per_request)
+        ]
+
+        logger.debug(f"어휘 후보 {self.candidates_per_request}개를 병렬로 생성 시작...")
+
+        # 병렬 실행 (예외 처리 포함)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 결과 처리
         candidates = []
-        
-        for i in range(self.candidates_per_request):
-            try:
-                response = await llm_client.generate_messages(prompt, temperature=self.temperature)
-                candidates.append(response)
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.warning(f"어휘 후보 {i+1} 생성 실패: {str(result)}")
+            else:
+                candidates.append(result)
                 logger.debug(f"어휘 후보 {i+1} 생성 완료")
-            except Exception as e:
-                logger.warning(f"어휘 후보 {i+1} 생성 실패: {str(e)}")
-    
+
+        logger.debug(f"병렬 생성 완료: {len(candidates)}개 성공")
         return candidates
 
 

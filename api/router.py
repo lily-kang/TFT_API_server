@@ -56,9 +56,22 @@ class SemanticProfileBatchRequestV2(BaseModel):
 @router.post("/semantic-profile", response_model=SemanticProfileResponse)
 async def generate_semantic_profile(req: SemanticProfileRequest):
 	try:
+		logger.info("=" * 80)
+		logger.info("📥 [SEMANTIC PROFILE] 엔드포인트 요청 수신")
+		logger.info("=" * 80)
+		logger.info(f"📄 입력 지문 길이: {len(req.passage_text)}자")
+		logger.info(f"📄 입력 지문 (처음 300자):\n{req.passage_text[:300]}...")
+		logger.info("=" * 80)
+		
 		result = await generate_semantic_profile_for_passage(req.passage_text)
+		
+		logger.info("=" * 80)
+		logger.info("✅ [SEMANTIC PROFILE] 엔드포인트 응답 완료")
+		logger.info("=" * 80)
+		
 		return result
 	except Exception as e:
+		logger.error(f"❌ [SEMANTIC PROFILE] 오류 발생: {str(e)}", exc_info=True)
 		raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -68,14 +81,33 @@ async def generate_semantic_profile(req: SemanticProfileRequest):
 )
 async def generate_semantic_profile_batch(req: Union[SemanticProfileBatchRequestV2, SemanticProfileBatchRequest]):
 	try:
+		logger.info("=" * 80)
+		logger.info("📥 [SEMANTIC PROFILE BATCH] 엔드포인트 요청 수신")
+		logger.info("=" * 80)
+		
 		# V1: 단순 문자열 배열
 		if isinstance(req, SemanticProfileBatchRequest):
+			logger.info(f"🔢 배치 항목 수: {len(req.passages)}개")
+			for idx, passage in enumerate(req.passages, 1):
+				logger.info(f"  [{idx}] 지문 길이: {len(passage)}자, 미리보기: {passage[:100]}...")
 			profiles = await generate_semantic_profiles_batch(req.passages)
+			logger.info("=" * 80)
+			logger.info("✅ [SEMANTIC PROFILE BATCH] 완료")
+			logger.info("=" * 80)
 			return profiles
 
 		# V2: 식별자/제목이 포함된 아이템 배열
+		logger.info(f"🔢 배치 항목 수: {len(req.items)}개")
+		for idx, item in enumerate(req.items, 1):
+			logger.info(f"  [{idx}] request_id: {item.request_id}, title: {item.title}, 지문 길이: {len(item.passage_text)}자")
+		
 		texts = [item.passage_text for item in req.items]
 		profiles = await generate_semantic_profiles_batch(texts)
+		
+		logger.info("=" * 80)
+		logger.info("✅ [SEMANTIC PROFILE BATCH] 완료")
+		logger.info("=" * 80)
+		
 		return [
 			GenSemProfileResponse(
 				request_id=item.request_id,
@@ -85,6 +117,7 @@ async def generate_semantic_profile_batch(req: Union[SemanticProfileBatchRequest
 			for idx, item in enumerate(req.items)
 		]
 	except Exception as e:
+		logger.error(f"❌ [SEMANTIC PROFILE BATCH] 오류 발생: {str(e)}", exc_info=True)
 		raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -172,100 +205,7 @@ async def topic_closeness_generate_and_score_batch(req: GenerateAndScoreBatchReq
 		raise HTTPException(status_code=500, detail=str(e))
 
 ##### ----------------------------- Revision ----------------------------- #####
-@router.post(
-    "/syntax-fix",
-    response_model=SyntaxFixResponse,
-    summary="구문 수정 실행",
-    description="단일 텍스트에 대해 구문 수정을 수행하고 단계별 진행 상황을 반환합니다."
-)
-async def fix_syntax(request: SyntaxFixRequest):
-    """
-    구문 수정 엔드포인트 (Service Layer 사용)
-    
-    Args:
-        request: 구문 수정 요청
-        
-    Returns:
-        단계별 구문 수정 결과
-    """
-    logger.info(f"구문 수정 요청 수신: request_id={request.request_id}, 텍스트={len(request.text)}글자")
-    
-    try:
-        # Service Layer로 위임 (기존 로직 그대로)
-        return await text_processing_service.fix_syntax_single(request)
-    except Exception as e:
-        logger.error(f"구문 수정 실패: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"구문 수정 중 오류가 발생했습니다: {str(e)}"
-        )
 
-
-@router.post(
-    "/batch-syntax-fix",
-    response_model=BatchSyntaxFixResponse,
-    summary="배치 구문 수정 실행",
-    description="여러 텍스트를 병렬로 구문 수정합니다."
-)
-async def batch_fix_syntax(request: BatchSyntaxFixRequest):
-    """
-    배치 구문 수정 엔드포인트 (Service Layer 사용)
-    
-    Args:
-        request: 배치 구문 수정 요청
-        
-    Returns:
-        배치 구문 수정 결과
-    """
-    total_start_time = time.time()
-    
-    try:
-        logger.info(f"배치 구문 수정 요청 수신: request_id={request.request_id}, 항목={len(request.items)}개")
-        
-        if not request.items:
-            raise HTTPException(status_code=400, detail="처리할 항목이 없습니다")
-        
-        # Service Layer로 위임
-        results = await text_processing_service.fix_syntax_batch(request.items, request.max_concurrent)
-        
-        # 결과 통계 계산
-        total_time = time.time() - total_start_time
-        successful_items = sum(1 for r in results if r.overall_success)
-        failed_items = len(results) - successful_items
-        overall_success = failed_items == 0
-        
-        # 응답 생성
-        response = BatchSyntaxFixResponse(
-            request_id=request.request_id,
-            overall_success=overall_success,
-            total_items=len(request.items),
-            successful_items=successful_items,
-            failed_items=failed_items,
-            results=results,
-            total_processing_time=total_time
-        )
-        
-        # 결과 통계 로깅
-        logger.info(f"배치 구문 수정 완료: 성공={successful_items}, 실패={failed_items}, 총시간={total_time:.2f}초")
-        
-        return response
-        
-    except Exception as e:
-        total_time = time.time() - total_start_time
-        error_msg = str(e)
-        logger.error(f"배치 구문 수정 실행 실패: {error_msg}")
-        
-        return BatchSyntaxFixResponse(
-            request_id=request.request_id,
-            overall_success=False,
-            total_items=len(request.items) if request.items else 0,
-            successful_items=0,
-            failed_items=len(request.items) if request.items else 0,
-            results=[],
-            total_processing_time=total_time,
-            error_message=error_msg
-        ) 
-        
 @router.post(
     "/analyze",
     summary="텍스트 지문 분석 요청",
@@ -298,11 +238,24 @@ async def analyze_text(data: AnalyzerRequest):
     description="구문 수정 후 결과를 분석하여 어휘 통과시 종료, 미통과시 어휘 단계로 분기합니다."
 )
 async def revise(request: SyntaxFixRequest):
-    logger.info(f"결합 리비전 요청 수신: request_id={request.request_id}, 텍스트={len(request.text)}글자")
+    logger.info("=" * 80)
+    logger.info("🚀 [REVISE] 엔드포인트 요청 수신")
+    logger.info("=" * 80)
+    logger.info(f"📄 request_id: {request.request_id}")
+    logger.info(f"📄 텍스트 길이: {len(request.text)}자")
+    logger.info(f"📄 텍스트 미리보기 (300자):\n{request.text[:300]}...")
+    logger.info("=" * 80)
+    
     try:
-        return await text_processing_service.fix_revise_single(request)
+        result = await text_processing_service.fix_revise_single(request)
+        
+        logger.info("=" * 80)
+        logger.info("✅ [REVISE] 엔드포인트 응답 완료")
+        logger.info("=" * 80)
+        
+        return result
     except Exception as e:
-        logger.error(f"Revision 실패: {str(e)}")
+        logger.error(f"❌ [REVISE] 오류 발생: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"revision 중 오류: {str(e)}")
 
 

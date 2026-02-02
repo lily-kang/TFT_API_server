@@ -40,11 +40,19 @@ class Settings(BaseSettings):
     llm_max_output_tokens: int = 4096
     
     # 기본 허용 오차 설정
+    # Polaris Labs에서 계산한 1.5 시그마(σ) 범위 기반 허용 오차
+    # 원문 난이도를 기준으로 통계적으로 산출된 값
     default_tolerance_abs: Dict[str, float] = {
+        # 평균 문장 길이 절대 허용 오차 (단위: 단어 수)
+        # 예: 마스터가 10.0이면 8.03~11.97 범위 허용
         "AVG_SENTENCE_LENGTH": 1.97
     }
     default_tolerance_ratio: Dict[str, float] = {
+        # 내포절 비율 상대 허용 오차 (20.2% 상대 변동)
+        # 예: 마스터가 0.5이면 0.399~0.601 범위 허용 (±0.101)
         "All_Embedded_Clauses_Ratio": 0.202,
+        # CEFR A1A2 어휘 비율 상대 허용 오차 (10.4% 상대 변동)
+        # 예: 마스터가 0.3이면 0.269~0.331 범위 허용 (±0.031)
         "CEFR_NVJD_A1A2_lemma_ratio": 0.104
     }
     

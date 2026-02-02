@@ -45,11 +45,11 @@ class MetricsJudge:
                 master.AVG_SENTENCE_LENGTH,
                 tolerance_abs.AVG_SENTENCE_LENGTH
             )
-            length_pass = length_range.is_within_range(metrics.get('AVG_SENTENCE_LENGTH', 0))
+            length_pass = length_range.is_within_range(metrics.AVG_SENTENCE_LENGTH)
             detailed_metrics["AVG_SENTENCE_LENGTH"] = {
                 "min_value": round(length_range.min_value, 3),
                 "max_value": round(length_range.max_value, 3),
-                "current_value": metrics.get('AVG_SENTENCE_LENGTH', 0),
+                "current_value": metrics.AVG_SENTENCE_LENGTH,
                 "is_pass": length_pass
             }
             
@@ -58,11 +58,11 @@ class MetricsJudge:
                 master.All_Embedded_Clauses_Ratio,
                 tolerance_ratio.All_Embedded_Clauses_Ratio
             )
-            clause_pass = clause_range.is_within_range(metrics.get('All_Embedded_Clauses_Ratio', 0))
+            clause_pass = clause_range.is_within_range(metrics.All_Embedded_Clauses_Ratio)
             detailed_metrics["All_Embedded_Clauses_Ratio"] = {
                 "min_value": round(clause_range.min_value, 3),
                 "max_value": round(clause_range.max_value, 3),
-                "current_value": metrics.get('All_Embedded_Clauses_Ratio', 0),
+                "current_value": metrics.All_Embedded_Clauses_Ratio,
                 "is_pass": clause_pass
             }
             
@@ -72,11 +72,11 @@ class MetricsJudge:
                 master.CEFR_NVJD_A1A2_lemma_ratio,
                 tolerance_ratio.CEFR_NVJD_A1A2_lemma_ratio
             )
-            lexical_pass = lexical_range.is_within_range(metrics.get('CEFR_NVJD_A1A2_lemma_ratio', 0))
+            lexical_pass = lexical_range.is_within_range(metrics.CEFR_NVJD_A1A2_lemma_ratio)
             detailed_metrics["CEFR_NVJD_A1A2_lemma_ratio"] = {
                 "min_value": lexical_range.min_value,
                 "max_value": lexical_range.max_value,
-                "current_value": metrics.get('CEFR_NVJD_A1A2_lemma_ratio', 0),
+                "current_value": metrics.CEFR_NVJD_A1A2_lemma_ratio,
                 "is_pass": lexical_pass
             }
             
