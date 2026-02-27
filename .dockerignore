@@ -1,0 +1,45 @@
+# 시크릿 및 환경변수 (Cloud Run에서 환경변수로 주입)
+.env
+.env.*
+config/secrets.py
+secrets.json
+
+# Python 캐시
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# 가상환경
+.venv/
+venv/
+env/
+ENV/
+
+# 테스트 / 커버리지
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# 개발 도구
+.git/
+.gitignore
+.idea/
+.vscode/
+
+# 로그 및 임시파일
+*.log
+logs/
+tmp/
+temp/
+*.tmp
+
+# 문서 (이미지에 불필요)
+*.md
+docs/
+
+# 기타
+nohup.out
+ngrok*
+*.tgz

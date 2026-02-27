@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     # 파이프라인 설정
     default_syntax_candidates: int = 3
     default_lexical_candidates: int = 3
-    pipeline_timeout: int = 300
+    pipeline_timeout: int = 600
     
     # LLM 설정 - 구문 수정용 temperature (각 temperature별로 2개씩 생성)
     llm_temperatures: list = [0.2, 0.3]

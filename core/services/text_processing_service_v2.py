@@ -41,9 +41,9 @@ class TextProcessingService:
                 original_evaluation = judge.evaluate(original_metrics, request.master, tolerance_abs, tolerance_ratio)
 
                 original_metrics_dict = {
-                    'AVG_SENTENCE_LENGTH': original_metrics.get('AVG_SENTENCE_LENGTH', 0),
-                    'All_Embedded_Clauses_Ratio': original_metrics.get('All_Embedded_Clauses_Ratio', 0),
-                    'CEFR_NVJD_A1A2_lemma_ratio': original_metrics.get('CEFR_NVJD_A1A2_lemma_ratio', 0)
+                    'AVG_SENTENCE_LENGTH': original_metrics.AVG_SENTENCE_LENGTH,
+                    'All_Embedded_Clauses_Ratio': original_metrics.All_Embedded_Clauses_Ratio,
+                    'CEFR_NVJD_A1A2_lemma_ratio': original_metrics.CEFR_NVJD_A1A2_lemma_ratio
                 }
 
                 step_results.append(StepResult(
@@ -306,7 +306,7 @@ class TextProcessingService:
                 final_metrics_dict = {
                     'AVG_SENTENCE_LENGTH': final_metrics.AVG_SENTENCE_LENGTH,
                     'All_Embedded_Clauses_Ratio': final_metrics.All_Embedded_Clauses_Ratio,
-                    'CEFR_NVJD_A1A2_lemma_ratio': final_metrics.CEFR_NVJD_A1A2_lemma_ratio
+                    'CEFR_NVJD_A1A2_lemma_ratio': final_metrics.CEFR_NVJD_A1A2_lemma_ratio,
                 }
 
             # 6) 어휘 통과 여부에 따른 분기
